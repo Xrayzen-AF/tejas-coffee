@@ -1,0 +1,27 @@
+@startuml
+title Flowchart — Barista
+
+start
+:Login barista;
+:KDS dashboard;
+repeat
+  :Lihat antrean;
+  if (Aksi?) then (bump)
+    :Sematkan kartu;
+  elseif (dismiss) then (dismiss)
+    :Sembunyikan kartu;
+  elseif (proses) then (proses)
+    :Status diproses;
+  elseif (selesai) then (selesai)
+    if (Sudah lunas & diproses?) then (tidak)
+      :Pesan error;
+    else (ya)
+      :Status selesai;
+      :Sinkron meja;
+    endif
+  else (ubah meja)
+    :Set kosong, terisi, atau dipesan;
+  endif
+repeat while (Masih ada antrean?) is (ya) not (selesai)
+stop
+@enduml

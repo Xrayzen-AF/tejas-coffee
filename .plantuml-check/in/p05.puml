@@ -1,0 +1,63 @@
+@startuml
+title Activity — Kasir POS
+
+start
+:Login kasir;
+:Buka /kasir/dashboard;
+:Pilih meja pada papan status realtime;
+repeat
+  :Tambah produk ke tiket session;
+repeat while (Tambah item lagi?) is (ya) not (tidak)
+
+if (Ubah atau hapus item?) then (ya)
+  :Update jumlah atau hapus item;
+else (tidak)
+endif
+
+:Isi tipe pesanan, meja, nama & No. HP;
+:Pilih metode cash, qris, atau transfer;
+:Klik Charge;
+
+if (Stok cukup & produk tersedia?) then (tidak)
+  :Tampilkan error stok;
+  stop
+else (ya)
+endif
+
+:OrderController::store;
+:INSERT pesanan, detail, transaksi menunggu;
+:Kurangi stok & sinkron meja;
+:Kosongkan session tiket;
+
+if (Metode pembayaran?) then (cash)
+  :Masukkan uang diterima;
+  if (Uang >= tagihan?) then (tidak)
+    :Error uang kurang;
+    stop
+  else (ya)
+  endif
+  :Hitung kembalian;
+  :UPDATE transaksi menjadi lunas;
+  :Poin member bertambah 1 per Rp 10.000;
+else (qris / transfer)
+  :Minta charge ke Midtrans Core API;
+  if (Ada pembayaran pending?) then (ya)
+    :Tampilkan ulang QR / VA lama;
+  else (tidak)
+    :Tampilkan QRIS / nomor VA;
+  endif
+  repeat
+    :Tunggu webhook atau polling status;
+  repeat while (Belum lunas?) is (ya) not (lunas / kedaluwarsa)
+  if (Kedaluwarsa 15 menit?) then (ya)
+    :Tandai gagal dan ulangi;
+    stop
+  else (tidak)
+    :UPDATE transaksi menjadi lunas + poin;
+  endif
+endif
+
+:Barista memproses pesanan di KDS;
+:Update status diproses lalu selesai;
+stop
+@enduml

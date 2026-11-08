@@ -1,0 +1,17 @@
+@startuml
+hide circle
+skinparam linetype ortho
+entity "pengguna" as pengguna {
+  * id_pengguna : bigint PK
+  --
+  nama_lengkap : varchar
+}
+entity "pesanan" as pesanan {
+  * id_pesanan : bigint PK
+}
+entity "transaksi" as transaksi {
+  * id_transaksi : bigint PK
+}
+pengguna ||--o{ pesanan : menangani
+pesanan ||--|| transaksi : dibayar
+@enduml

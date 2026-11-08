@@ -1,0 +1,9 @@
+@startuml
+entity "pengguna" as pengguna {
+  * id : bigint
+}
+entity "pesanan" as pesanan {
+  * id : bigint
+}
+pengguna ||--o{ pesanan : menangani
+@enduml

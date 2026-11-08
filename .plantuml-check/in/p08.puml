@@ -1,0 +1,27 @@
+@startuml
+title Flowchart — Pelanggan
+
+start
+:Buka aplikasi;
+if (Punya akun?) then (belum)
+  :Registrasi;
+else (sudah)
+endif
+:Login;
+:Dashboard pelanggan;
+:Buka menu;
+if (Scan QR meja?) then (ya)
+  :Check-in meja;
+else (tidak)
+endif
+:Pilih produk & kustom;
+:Keranjang;
+:Checkout;
+:Pesanan dibuat;
+:Bayar;
+repeat
+  :Lihat status pesanan;
+repeat while (Belum selesai?) is (ya) not (selesai)
+:Buka riwayat & poin;
+stop
+@enduml

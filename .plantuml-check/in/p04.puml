@@ -1,0 +1,73 @@
+@startuml
+title Activity — Scan QR Meja
+
+start
+:Scan QR fisik meja;
+:Buka /meja/{qr_token};
+if (Token valid?) then (tidak)
+  :Tampilkan 404;
+  stop
+else (ya)
+endif
+
+:Bersihkan sesi meja kedaluwarsa;
+
+if (Status meja?) then (kosong)
+  if (Sudah login sebagai pelanggan?) then (tidak)
+    :Tampilkan tombol login;
+    stop
+  else (ya)
+  endif
+  if (No. HP di profil terisi?) then (tidak)
+    :Minta lengkapi profil;
+    stop
+  else (ya)
+  endif
+  :Kunci baris meja lockForUpdate;
+  if (Ada reservasi aktif?) then (milik sendiri)
+    :Tandai meja terisi, pakai sesi lama;
+  elseif (milik orang lain) then (orang lain)
+    :Error meja sudah dipesan pelanggan lain;
+    stop
+  else (tidak ada)
+    if (Ada pesanan aktif atau status bukan kosong?) then (ya)
+      :Error meja sedang terpakai;
+      stop
+    else (tidak)
+      :INSERT reservasi_meja kode booking 90 menit;
+      :UPDATE meja.status = terisi;
+    endif
+  endif
+  :Tampilkan kode booking;
+  :Pelanggan memesan menu;
+
+elseif (terisi) then (terisi)
+  :Info meja sedang terpakai;
+  :Minta kode booking;
+  :Verifikasi kode booking;
+  if (Cocok & sesi aktif?) then (ya)
+    :Izinkan akses meja;
+  else (tidak)
+    :Error kode tidak cocok;
+    stop
+  endif
+
+else (dipesan)
+  :Info meja dipesan;
+  :Minta kode booking;
+  :Verifikasi kode booking;
+  if (Cocok & sesi aktif?) then (ya)
+    :Izinkan akses meja;
+  else (tidak)
+    :Error kode tidak cocok;
+    stop
+  endif
+endif
+
+if (Selesai memakai meja?) then (ya)
+  :Lepas meja menjadi kosong;
+else (tidak)
+  :Meja kosong otomatis setelah tenggang 15 menit;
+endif
+stop
+@enduml

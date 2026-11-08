@@ -1,0 +1,39 @@
+@startuml
+title Activity — Login & Otorisasi
+
+start
+:Buka halaman /;
+if (Sudah login?) then (ya)
+else (belum)
+  :Tampilkan form login;
+  :Input email atau No. HP + kata sandi;
+  if (Validasi input?) then (ya)
+  else (tidak)
+    :Tampilkan pesan validasi;
+    stop
+  endif
+  if (Autentikasi berhasil?) then (ya)
+  else (tidak)
+    :Tampilkan pesan email atau No. HP salah;
+    stop
+  endif
+endif
+
+if (status_aktif bernilai true?) then (ya)
+else (tidak)
+  :Logout paksa + pesan akun dinonaktifkan;
+  stop
+endif
+
+:Regenerasi session;
+if (Cek kolom peran) then (admin)
+  :Buka /admin/dashboard;
+elseif (kasir) then (kasir)
+  :Buka /kasir/dashboard;
+elseif (barista) then (barista)
+  :Buka /barista/dashboard;
+else (pelanggan)
+  :Buka /pelanggan/dashboard;
+endif
+stop
+@enduml

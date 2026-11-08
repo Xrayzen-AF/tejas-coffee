@@ -1,0 +1,40 @@
+@startuml
+title Activity — Admin Ops Console
+
+start
+:Login admin;
+:Buka /admin/dashboard;
+:Lihat ringkasan toko;
+
+if (Pilih modul?) then (Pegawai)
+  :CRUD akun kasir & barista;
+elseif (Master Kategori) then (Kategori)
+  :CRUD kategori;
+elseif (Master Produk) then (Produk)
+  :CRUD produk + upload gambar;
+elseif (Master Meja) then (Meja)
+  :CRUD meja & cetak lembar QR;
+elseif (Master Promo) then (Promo)
+  :CRUD promo + masa berlaku;
+elseif (Inventori) then (Inventori)
+  :CRUD bahan & reorder biji kopi;
+elseif (CRM) then (CRM)
+  :Kelola pelanggan & sesuaikan poin;
+elseif (Penjualan) then (Laporan)
+  :Lihat laporan penjualan;
+elseif (Pengaturan) then (Settings)
+  :Atur profil toko, biaya layanan, poin, metode bayar;
+elseif (Midtrans) then (Midtrans)
+  :Simpan server key & client key;
+else (Pesanan)
+  :Ubah status atau hapus pesanan;
+endif
+
+if (Validasi input?) then (tidak)
+  :Tampilkan pesan validasi;
+  stop
+else (ya)
+endif
+:Simpan ke database atau JSON settings;
+stop
+@enduml

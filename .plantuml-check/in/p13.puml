@@ -1,0 +1,38 @@
+@startuml
+title Sequence — Login & RBAC
+autonumber
+
+actor "Pengguna" as U
+participant "Browser (Blade)" as B
+participant "LoginController" as L
+participant "Pengguna (Model)" as M
+participant "Session" as S
+participant "Middleware role" as MW
+
+U -> B : Isi email / No. HP + kata sandi
+B -> L : POST /login dengan throttle 10 per menit
+L -> L : Validasi input
+L -> M : Auth::attempt field, password
+M --> L : Berhasil / gagal
+
+alt Kredensial salah
+  L --> B : ValidationException
+  B --> U : Tampilkan pesan error
+else Kredensial benar
+  L -> M : Cek status_aktif
+  alt Akun nonaktif
+    L -> S : invalidate + regenerate token
+    L --> B : Pesan akun dinonaktifkan
+  else Akun aktif
+    L -> S : regenerate session
+    L --> B : Redirect sesuai peran
+    B -> MW : GET dashboard peran
+    MW -> MW : Bandingkan user.peran
+    alt Peran cocok
+      MW --> B : 200 halaman dashboard
+    else Peran tidak cocok
+      MW --> B : 403 Forbidden
+    end
+  end
+end
+@enduml

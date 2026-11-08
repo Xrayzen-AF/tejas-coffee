@@ -1,0 +1,15 @@
+@startuml
+title State — status_pembayaran
+
+[*] --> menunggu : Pesanan dibuat, transaksi otomatis
+menunggu --> lunas : Kasir tandai lunas atau webhook Midtrans
+menunggu --> gagal : QRIS atau VA kedaluwarsa
+gagal --> menunggu : Kasir membuat charge ulang
+lunas --> [*]
+
+note right of lunas
+  Saat lunas poin member bertambah
+  floor total_harga / 10000
+  Status pesanan tidak otomatis berubah
+end note
+@enduml

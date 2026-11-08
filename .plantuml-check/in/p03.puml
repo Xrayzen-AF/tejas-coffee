@@ -1,0 +1,91 @@
+@startuml
+title Activity — Pelanggan Memesan & Membayar
+
+start
+:Buka menu /pelanggan/menu;
+:Filter kategori atau cari produk;
+repeat
+  :Pilih produk;
+  if (Butuh kustomisasi?) then (ya)
+    :Atur opsi, jumlah, catatan;
+  else (tidak)
+  endif
+  :Tambah ke keranjang;
+repeat while (Lanjut belanja?) is (ya) not (tidak)
+
+:Buka keranjang;
+if (Ubah jumlah atau hapus item?) then (ya)
+  :Update / hapus item;
+else (tidak)
+endif
+
+if (Pakai voucher?) then (ya)
+  :Input kode promo;
+  if (Voucher aktif & dalam periode?) then (ya)
+    :Simpan kode di session;
+  else (tidak)
+    :Tampilkan error voucher;
+    :Kembali ke keranjang;
+    stop
+  endif
+else (tidak)
+endif
+
+if (Tukar poin?) then (ya)
+  :Hitung poin terpakai;
+else (tidak)
+endif
+
+:Buka checkout;
+if (Tipe pesanan?) then (dine-in)
+  :Pilih meja;
+else (takeaway)
+endif
+
+:Isi nama & No. HP pelanggan;
+if (No. HP akun terisi?) then (tidak)
+  :Redirect ke profil untuk melengkapi No. HP;
+  stop
+else (ya)
+endif
+
+:OrderController::store;
+:Kunci baris produk lockForUpdate;
+if (Stok mencukupi?) then (tidak)
+  :HTTP 422 stok tidak cukup;
+  stop
+else (ya)
+endif
+
+:Hitung subtotal + diskon promo + poin + biaya layanan;
+:INSERT pesanan status baru;
+:INSERT detail_pesanan;
+:UPDATE stok produk;
+:INSERT transaksi status menunggu;
+:Sinkron status meja;
+:Kosongkan session keranjang, voucher, poin;
+:Buka halaman status pesanan;
+
+if (Metode bayar?) then (tunai)
+  :Kasir tandai lunas + hitung kembalian;
+else (QRIS / VA)
+  :Kasir buat charge Midtrans;
+endif
+
+if (Status pembayaran?) then (lunas)
+  :Poin member bertambah 1 per Rp 10.000;
+elseif (gagal) then (gagal)
+  :Minta metode pembayaran lain;
+  stop
+else (menunggu)
+  repeat
+    :Polling status / tunggu webhook;
+  repeat while (Masih menunggu?) is (ya) not (lunas)
+  :Status menjadi lunas;
+endif
+
+:Barista memproses pesanan;
+:Kasir / barista menandai selesai;
+:Buka struk & riwayat pesanan;
+stop
+@enduml

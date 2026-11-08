@@ -1,0 +1,24 @@
+@startuml
+title Flowchart — Admin
+
+start
+:Login admin;
+:Dashboard ringkasan;
+if (Pilih menu?) then (Master Data)
+  :Kategori, Produk, Meja+QR, Promo;
+elseif (Kepegawaian) then (Kepegawaian)
+  :Akun kasir & barista;
+elseif (Inventori) then (Inventori)
+  :Stok bahan & reorder;
+elseif (CRM) then (CRM)
+  :Pelanggan & poin;
+elseif (Penjualan) then (Penjualan)
+  :Laporan penjualan;
+elseif (Pengaturan) then (Pengaturan)
+  :Toko, biaya layanan, Midtrans;
+else (Pesanan)
+  :Ubah status & hapus pesanan;
+endif
+:Simpan, ubah, atau hapus data;
+stop
+@enduml

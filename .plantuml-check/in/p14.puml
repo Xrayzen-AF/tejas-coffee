@@ -1,0 +1,49 @@
+@startuml
+title Sequence — Checkout Pelanggan
+autonumber
+
+actor "Pelanggan" as P
+participant "Browser" as B
+participant "CartController" as C
+participant "OrderController" as O
+database "Database" as DB
+participant "Store Settings JSON" as SET
+
+P -> B : Klik "Buat Pesanan" di checkout
+B -> C : POST /pelanggan/checkout
+C -> C : Ambil keranjang dari session
+C -> C : Validasi tipe pesanan & meja
+C -> DB : Cari atau buat pelanggan by No. HP
+C -> DB : Validasi ulang voucher promo
+C -> O : store inner request + user resolver
+
+O -> DB : BEGIN TRANSACTION
+O -> DB : SELECT produk FOR UPDATE
+alt Stok tidak cukup
+  O --> C : abort 422
+  C --> B : Redirect checkout + pesan error
+else Stok cukup
+  O -> DB : INSERT pesanan status baru
+  loop Setiap item
+    O -> DB : INSERT detail_pesanan snapshot harga
+  end
+  O -> DB : UPDATE produk.stok = stok - jumlah
+  O -> O : Hitung subtotal
+  opt Voucher valid
+    O -> O : Hitung diskon persen / nominal
+  end
+  opt Tukar poin
+    O -> DB : SELECT pelanggan FOR UPDATE
+    O -> DB : UPDATE poin_loyalitas
+  end
+  O -> SET : Baca biaya_layanan
+  O -> DB : UPDATE pesanan total, diskon, biaya
+  O -> DB : INSERT transaksi status menunggu
+  O -> DB : Sinkronisasi status meja
+  O -> DB : COMMIT
+  O --> C : 201 + data pesanan
+  C -> C : Hapus session keranjang, voucher, poin
+  C --> B : Redirect halaman status pesanan
+  B --> P : Halaman status pesanan
+end
+@enduml

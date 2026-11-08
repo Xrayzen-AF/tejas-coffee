@@ -1,0 +1,32 @@
+@startuml
+title Flowchart — Kasir
+
+start
+:Login kasir;
+:POS dashboard;
+if (Tipe transaksi?) then (pesanan baru)
+  :Pilih meja;
+  repeat
+    :Tambah item ke tiket;
+  repeat while (Belum charge?) is (ya) not (charge)
+  :Pilih metode bayar;
+  :Pesanan dibuat;
+  if (Metode?) then (tunai)
+    :Input uang & kembalian;
+  else (qris / VA)
+    :Tampilkan QR / nomor VA;
+    repeat
+      :Cek status pembayaran;
+    repeat while (Belum terbayar?) is (ya) not (lunas)
+  endif
+  :Lunas & poin;
+else (pesanan lama)
+  :Ubah status atau lunasi;
+endif
+:Cetak struk;
+if (Pesanan selesai dimasak?) then (ya)
+  :Update status pesanan;
+else (belum)
+endif
+stop
+@enduml

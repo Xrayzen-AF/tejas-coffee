@@ -1,0 +1,24 @@
+@startuml
+title Perhitungan Total Pesanan
+
+start
+:Subtotal = jumlah seluruh harga_satuan x jumlah;
+if (Pakai voucher?) then (persen)
+  :diskon = subtotal x persen;
+elseif (nominal) then (nominal)
+  :diskon = min nilai nominal, subtotal;
+else (tidak)
+  :diskon voucher = 0;
+endif
+
+if (Pakai poin?) then (ya)
+  :poin_dipakai = min saldo, floor total / 10;
+  :diskon poin = poin x Rp 10;
+else (tidak)
+  :diskon poin = 0;
+endif
+
+:biaya_layanan dari Store Settings;
+:total_harga = subtotal - diskon + biaya_layanan;
+stop
+@enduml
