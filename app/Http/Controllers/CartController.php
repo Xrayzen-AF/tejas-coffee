@@ -485,6 +485,12 @@ class CartController extends Controller
             ['nama_pelanggan' => $pengguna->nama_lengkap, 'poin_loyalitas' => 0],
         );
 
+        // Nama member mengikuti nama akun, supaya struk/riwayat tidak
+        // menampilkan nama lama atau nama pemilik nomor sebelumnya.
+        if ($pelanggan->nama_pelanggan !== $pengguna->nama_lengkap) {
+            $pelanggan->update(['nama_pelanggan' => $pengguna->nama_lengkap]);
+        }
+
         // Voucher + poin dari Step 02 (divalidasi ulang di OrderController).
         $kodePromo = session('voucher_kode');
         if ($kodePromo) {

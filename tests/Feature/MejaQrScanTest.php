@@ -65,6 +65,18 @@ class MejaQrScanTest extends TestCase
         $this->assertSame(40, strlen($satu->qr_token));
     }
 
+    public function test_pemindai_qr_meja_hanya_untuk_pelanggan_login(): void
+    {
+        $this->get(route('pelanggan.meja.pindai'))->assertRedirect(route('login'));
+
+        $this->actingAs($this->pelanggan())
+            ->get(route('pelanggan.meja.pindai'))
+            ->assertOk()
+            ->assertSee('Scan QR Meja')
+            ->assertSee('Buka kamera')
+            ->assertSee('Lihat status semua meja');
+    }
+
     public function test_tamu_bisa_melihat_status_meja_tanpa_login(): void
     {
         $meja = $this->meja('M02');

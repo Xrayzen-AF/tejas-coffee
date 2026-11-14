@@ -257,10 +257,12 @@
             <dd>: {{ $pesanan->nomor_pesanan }}</dd>
             <dt>Pelayan</dt>
             <dd>: {{ $pelayan }}</dd>
+            {{-- Pesanan dari akun pelanggan memakai nama akun pembeli; member
+                 hanya cadangan untuk order walk-in/kasir tanpa akun. --}}
             <dt>Pelanggan</dt>
-            <dd>: {{ $pesanan->pelanggan?->nama_pelanggan ?? '-' }}</dd>
+            <dd>: {{ $pesanan->pengguna?->nama_lengkap ?? $pesanan->pelanggan?->nama_pelanggan ?? '-' }}</dd>
             <dt>Telepon</dt>
-            <dd>: {{ $pesanan->pelanggan?->nomor_telepon ?: '-' }}</dd>
+            <dd>: {{ $pesanan->pengguna?->nomor_telepon ?: ($pesanan->pelanggan?->nomor_telepon ?: '-') }}</dd>
         </dl>
 
         <hr class="dashed">

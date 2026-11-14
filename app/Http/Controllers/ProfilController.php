@@ -98,6 +98,11 @@ class ProfilController extends Controller
             ...(empty($validated['password']) ? [] : ['kata_sandi' => $validated['password']]),
         ]);
 
+        // Nama member ikut berubah agar struk memakai nama terbaru.
+        if ($teleponBaru && $member = Pelanggan::where('nomor_telepon', $teleponBaru)->first()) {
+            $member->update(['nama_pelanggan' => trim($validated['nama_lengkap'])]);
+        }
+
         return redirect()->route('pelanggan.profil')
             ->with('success', 'Profil berhasil diperbarui.');
     }

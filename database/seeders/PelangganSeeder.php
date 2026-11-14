@@ -10,7 +10,10 @@ class PelangganSeeder extends Seeder
     public function run(): void
     {
         $pelanggan = [
-            ['nama_pelanggan' => 'Budi Santoso', 'nomor_telepon' => '081234567890', 'poin_loyalitas' => 120],
+            // Harus sama dengan nomor akun budi@mail.com, bukan nomor akun
+            // pelanggan@kopi.dev — kalau bentrok, order pelanggan itu
+            // tercatat atas nama member Budi.
+            ['nama_pelanggan' => 'Budi Santoso', 'nomor_telepon' => '081234567892', 'poin_loyalitas' => 120],
             ['nama_pelanggan' => 'Siti Rahma', 'nomor_telepon' => '082198765432', 'poin_loyalitas' => 80],
             ['nama_pelanggan' => 'Andi Wijaya', 'nomor_telepon' => '085612345678', 'poin_loyalitas' => 25],
         ];

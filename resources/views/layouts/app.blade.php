@@ -215,5 +215,127 @@
             }, 4000);
         </script>
     @endif
+
+    {{-- Watchdog geofence: pelanggan yang sudah login tetap dicek posisinya berkala. --}}
+    @auth
+        @if (auth()->user()->peran === 'pelanggan' && \App\Support\CafeGeofence::active() && ! request()->routeIs('pelanggan.lokasi'))
+            <script>
+            (function () {
+                if (window.location.pathname.indexOf('/pelanggan/lokasi') === 0) return;
+
+                var cfg = {
+                    url: "{{ route('pelanggan.lokasi.cek') }}",
+                    gate: "{{ route('pelanggan.lokasi') }}",
+                    interval: {{ \App\Support\CafeGeofence::WATCH_INTERVAL_SECONDS * 1000 }},
+                    batasAkurasi: {{ (int) round(\App\Support\CafeGeofence::maxAccuracy()) }},
+                    csrf: document.querySelector('meta[name="csrf-token"]').content
+                };
+                var busy = false, kicked = false, gagal = 0;
+
+                function keGerbang() {
+                    if (kicked) return;
+                    kicked = true;
+                    window.location.href = cfg.gate;
+                }
+
+                function kirim(pos) {
+                    busy = true;
+                    fetch(cfg.url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': cfg.csrf
+                        },
+                        body: JSON.stringify({
+                            latitude: pos.coords.latitude,
+                            longitude: pos.coords.longitude,
+                            accuracy: Math.round(pos.coords.accuracy)
+                        })
+                    }).then(function (r) {
+                        return r.json().catch(function () { return {}; }).then(function (d) {
+                            return { status: r.status, data: d };
+                        });
+                    }).then(function (res) {
+                        busy = false;
+                        gagal = 0;
+                        if (res.status === 403 && res.data && res.data.redirect) {
+                            window.location.href = res.data.redirect;
+                            kicked = true;
+                        }
+                    }).catch(function () {
+                        busy = false;
+                    });
+                }
+
+                // Ambil beberapa sampel singkat lalu pakai pembacaan paling akurat.
+                function ambilPosisi(selesai) {
+                    var terbaik = null, berhenti = false, id = null, timer = null;
+
+                    function tutup() {
+                        if (berhenti) return;
+                        berhenti = true;
+                        clearTimeout(timer);
+                        if (id !== null) navigator.geolocation.clearWatch(id);
+                        selesai(terbaik);
+                    }
+
+                    id = navigator.geolocation.watchPosition(function (pos) {
+                        if (!terbaik || pos.coords.accuracy < terbaik.coords.accuracy) {
+                            terbaik = pos;
+                        }
+                        if (terbaik.coords.accuracy <= 25) tutup();
+                    }, function (err) {
+                        if (err.code === 1) {
+                            keGerbang();
+                            tutup();
+                        }
+                        // Kode 2/3 sering sementara: tunggu sampai batas waktu.
+                    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+
+                    timer = setTimeout(tutup, 6000);
+                }
+
+                function cekPosisi() {
+                    if (busy || kicked || document.hidden) return;
+
+                    if (!('geolocation' in navigator)) {
+                        keGerbang();
+                        return;
+                    }
+
+                    busy = true;
+                    ambilPosisi(function (pos) {
+                        if (!pos) {
+                            busy = false;
+                            // GPS mati/timeout: toleransi 3 kali berturut-turut.
+                            gagal += 1;
+                            if (gagal >= 3) keGerbang();
+                            return;
+                        }
+
+                        // Pembacaan kasar bisa salah menuduh keluar radius: jangan dikirim.
+                        if (pos.coords.accuracy > cfg.batasAkurasi) {
+                            busy = false;
+                            gagal = 0;
+                            setTimeout(cekPosisi, 15000);
+                            return;
+                        }
+
+                        kirim(pos);
+                    });
+                }
+
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden) cekPosisi();
+                });
+
+                cekPosisi();
+                setInterval(cekPosisi, cfg.interval);
+            })();
+            </script>
+        @endif
+    @endauth
 </body>
 </html>

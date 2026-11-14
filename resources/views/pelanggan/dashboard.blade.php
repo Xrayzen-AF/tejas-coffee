@@ -368,6 +368,12 @@
                     <p class="col-span-full py-6 text-center text-xs text-[#B8A8A1]" data-meja-empty>Belum ada meja terdaftar.</p>
                 @endforelse
             </div>
+            <div class="mt-4 px-5">
+                <a href="{{ route('pelanggan.meja.pindai') }}"
+                   class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#D97706] px-4 py-2.5 text-xs font-bold text-[#241708] hover:bg-[#F59E0B]">
+                    <i data-lucide="scan-line" class="h-4 w-4"></i> Scan QR meja
+                </a>
+            </div>
             <p class="mt-4 px-5 pb-4 text-[11px] leading-relaxed text-[#9D8E87]">
                 Status diperbarui otomatis tiap 5 detik.
                 <span class="font-semibold text-[#4ADE80]">Kosong</span> siap dipakai,

@@ -16,6 +16,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LokasiController;
 use App\Http\Controllers\MejaQrController;
 use App\Http\Controllers\MidtransPaymentController;
 use App\Http\Controllers\ProfilController;
@@ -96,6 +97,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::put('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/metode', [SettingController::class, 'storeMetode'])->name('settings.metode');
     Route::put('/settings/midtrans', [SettingController::class, 'updateMidtrans'])->name('settings.midtrans');
+    Route::put('/settings/geofence', [SettingController::class, 'updateGeofence'])->name('settings.geofence');
 
     // === Master data (CRUD penuh oleh admin) ===
     Route::prefix('master')->name('master.')->group(function () {
@@ -146,12 +148,29 @@ Route::middleware(['auth', 'role:barista'])->prefix('barista')->name('barista.')
     Route::post('/dismiss/{pesanan}', [DashboardController::class, 'kdsDismiss'])->name('dismiss');
 });
 
+// Gerbang GPS: bisa dibuka walau geofence belum lolos verifikasi.
 Route::middleware(['auth', 'role:pelanggan'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
+    Route::get('/lokasi', [LokasiController::class, 'show'])->name('lokasi');
+    Route::post('/lokasi', [LokasiController::class, 'verify'])
+        ->middleware('throttle:30,1')
+        ->name('lokasi.verifikasi');
+    // Watchdog realtime: dipanggil berkala oleh browser pelanggan.
+    Route::post('/lokasi/cek', [LokasiController::class, 'cek'])
+        ->middleware('throttle:120,1')
+        ->name('lokasi.cek');
+});
+
+// Seluruh halaman pelanggan lain wajib GPS aktif & di dalam radius cafe.
+Route::middleware(['auth', 'role:pelanggan', 'geofence'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'pelanggan'])->name('dashboard');
     // Riwayat pesanan punya halaman sendiri, tidak lagi menumpang di beranda.
     Route::get('/riwayat', [DashboardController::class, 'riwayat'])->name('riwayat');
     // Status meja realtime (dipolling oleh panel "Status Meja" di beranda).
     Route::get('/meja/status', [DashboardController::class, 'mejaStatusPelanggan'])->name('meja.status');
+
+    // Pemindai QR di dalam aplikasi (kamera). Harus di atas rute {meja:qr_token}
+    // agar "pindai" tidak dianggap token meja.
+    Route::get('/meja/pindai', [MejaQrController::class, 'pindai'])->name('meja.pindai');
 
     // Check-in & lepas meja tetap wajib akun pelanggan.
     // URL lama (/pelanggan/meja/...) diarahkan ke halaman scan publik.

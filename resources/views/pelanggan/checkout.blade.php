@@ -57,7 +57,8 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('pelanggan.checkout.simpan') }}">
+        <form method="POST" action="{{ route('pelanggan.checkout.simpan') }}"
+              id="checkoutForm" onsubmit="kunciTombolCheckout(this);">
             @csrf
 
             {{-- Tipe pemesanan --}}
@@ -201,8 +202,12 @@
                             <p class="rounded bg-[#D97706] px-2.5 py-1 text-[11px] font-bold text-[#241708]">Hemat {{ $rp($hemat) }}</p>
                         @endif
                     </div>
-                    <button type="submit" class="grotesk mt-2.5 w-full rounded-lg bg-[#D97706] py-4 text-[16px] font-bold text-[#241708] transition hover:bg-[#B56100]">
-                        Buat Pesanan & Kirim ke Barista ({{ $rp($ringkasan['total']) }})
+                    <button type="submit" id="btnSubmitCheckout"
+                            class="grotesk mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#D97706] py-4 text-[16px] font-bold text-[#241708] transition hover:bg-[#B56100]">
+                        <span id="btnTextCheckout">Buat Pesanan &amp; Kirim ke Barista ({{ $rp($ringkasan['total']) }})</span>
+                        <span id="btnSpinnerCheckout" class="hidden items-center gap-2">
+                            <i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Memproses Pesanan...
+                        </span>
                     </button>
                     <p class="mt-1.5 text-center text-[11px] text-[#B8A8A1]">Bayar tunai di kasir setelah pesanan dibuat.</p>
                 </div>
@@ -222,6 +227,30 @@
 </div>
 
 @push('scripts')
-<script>if (window.lucide) lucide.createIcons();</script>
+<script>
+    if (window.lucide) lucide.createIcons();
+
+    // S3-07: cegah pesanan ganda saat koneksi lambat / tombol ditekan dua kali.
+    function kunciTombolCheckout(form) {
+        if (form.dataset.terkirim === '1') {
+            return false; // klik kedua diabaikan
+        }
+        form.dataset.terkirim = '1';
+
+        var btn = document.getElementById('btnSubmitCheckout');
+        var teks = document.getElementById('btnTextCheckout');
+        var spinner = document.getElementById('btnSpinnerCheckout');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.setAttribute('aria-busy', 'true');
+        }
+        if (teks) teks.classList.add('hidden');
+        if (spinner) spinner.classList.remove('hidden');
+
+        return true; // lanjutkan submit pertama
+    }
+</script>
 @endpush
 @endsection

@@ -36,6 +36,11 @@ class SettingController extends Controller
             'poin_per_10k' => 1,
             'biaya_layanan' => 0,
             'roastery_destination' => 'Roastery Dispatch #01',
+            // Geofence kedatangan: pelanggan wajib GPS di dalam radius cafe.
+            'geofence_enabled' => true,
+            'cafe_latitude' => null,
+            'cafe_longitude' => null,
+            'radius_meter' => 150,
         ];
     }
 
@@ -104,12 +109,58 @@ class SettingController extends Controller
             'roastery_destination' => ['required', 'string', 'max:100'],
         ]);
 
-        file_put_contents(
-            storage_path('app/'.self::FILE),
-            json_encode($v, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-        );
+        // Gabungkan dengan setting lama supaya kunci lain (mis. geofence)
+        // tidak terhapus saat form profil/default disimpan.
+        $this->save(array_merge(self::load(), $v));
 
         return back()->with('success', 'Pengaturan toko disimpan.');
+    }
+
+    /**
+     * Titik & radius cafe yang boleh membuka aplikasi pelanggan.
+     * Latitude/longitude wajib saat geofence diaktifkan.
+     */
+    public function updateGeofence(Request $request): RedirectResponse
+    {
+        $v = $request->validate([
+            'cafe_latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_if:geofence_enabled,1'],
+            'cafe_longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_if:geofence_enabled,1'],
+            'radius_meter' => ['required', 'integer', 'min:10', 'max:10000'],
+        ], [
+            'cafe_latitude.required_if' => 'Isi titik cafe (latitude) sebelum mengaktifkan geofence.',
+            'cafe_longitude.required_if' => 'Isi titik cafe (longitude) sebelum mengaktifkan geofence.',
+            'cafe_latitude.between' => 'Latitude harus antara -90 dan 90.',
+            'cafe_longitude.between' => 'Longitude harus antara -180 dan 180.',
+        ]);
+
+        $settings = self::load();
+        $settings['geofence_enabled'] = $request->boolean('geofence_enabled');
+        $settings['cafe_latitude'] = ($v['cafe_latitude'] ?? '') === '' ? null : (float) $v['cafe_latitude'];
+        $settings['cafe_longitude'] = ($v['cafe_longitude'] ?? '') === '' ? null : (float) $v['cafe_longitude'];
+        $settings['radius_meter'] = (int) $v['radius_meter'];
+
+        if ($settings['geofence_enabled']
+            && ($settings['cafe_latitude'] === null || $settings['cafe_longitude'] === null)) {
+            return back()->withErrors([
+                'cafe_latitude' => 'Titik cafe belum diisi, geofence belum bisa diaktifkan.',
+            ])->withInput();
+        }
+
+        $this->save($settings);
+
+        $pesan = $settings['geofence_enabled']
+            ? 'Geofence aktif: pelanggan wajib GPS di dalam radius '.$settings['radius_meter'].' m dari cafe.'
+            : 'Geofence dimatikan: pelanggan bisa membuka aplikasi dari mana saja.';
+
+        return back()->with('success', $pesan);
+    }
+
+    private function save(array $settings): void
+    {
+        file_put_contents(
+            storage_path('app/'.self::FILE),
+            json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+        );
     }
 
     public function storeMetode(Request $request): RedirectResponse

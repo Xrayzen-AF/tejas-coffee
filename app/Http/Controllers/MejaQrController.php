@@ -17,6 +17,15 @@ class MejaQrController extends Controller
 {
     public function __construct(private readonly MejaQrService $mejaQr) {}
 
+    /**
+     * Pemindai QR di dalam aplikasi: kamera membaca QR fisik di meja,
+     * lalu diarahkan ke halaman status meja (meja.scan).
+     */
+    public function pindai(): View
+    {
+        return view('pelanggan.meja-pindai');
+    }
+
     public function show(Request $request, Meja $meja): View
     {
         $idTerverifikasi = $request->session()->get($this->kunciVerifikasi($meja));
