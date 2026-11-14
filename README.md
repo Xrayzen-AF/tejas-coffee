@@ -4,6 +4,10 @@ Aplikasi pemesanan coffee shop berbasis **Laravel 12** + **MySQL** dengan empat 
 (admin, kasir, barista, pelanggan), pemesanan mandiri lewat **QR meja**, pembayaran **Midtrans**
 (QRIS & virtual account), serta **KDS** (kitchen/bar display) untuk barista.
 
+**Versi rilis:** `v1.0.0-rc` · Artefak Sprint 4 (manual pengguna, dokumentasi
+teknis, spesifikasi API, slide presentasi, naskah demo, dan panduan deployment)
+tersedia di [`docs/`](docs/README.md).
+
 ## Tumpukan Teknologi
 
 | Komponen | Versi / Keterangan |
@@ -209,6 +213,7 @@ app/Services/                   MidtransService, MejaQrService, Agents (sales/st
 app/Console/Commands/           meja:bersihkan (scheduler)
 resources/views/                Blade per peran (admin, kasir, barista, pelanggan)
 tests/Feature/                  Test integrasi lintas peran
+docs/                           Dokumentasi Sprint 4 (manual, teknis, API, slide, deployment)
 screenshots/                    Tangkapan layar dokumentasi UI
 ```
 

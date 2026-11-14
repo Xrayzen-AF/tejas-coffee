@@ -1,0 +1,347 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Tejas Coffee POS API",
+    "version": "1.0.0-rc",
+    "description": "Spesifikasi endpoint HTTP Tejas Coffee POS (Sistem Pemesanan Coffee Shop). Terbagi menjadi tiga kelompok: katalog publik, transaksi pesanan (wajib sesi login), dan Ops Agent API untuk ringkasan operasional. Semua nominal dalam Rupiah (integer/decimal)."
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "Pengembangan lokal" },
+    { "url": "https://{domain}", "description": "Staging / produksi", "variables": { "domain": { "default": "example.com" } } }
+  ],
+  "tags": [
+    { "name": "Katalog", "description": "Endpoint publik untuk menu" },
+    { "name": "Pesanan", "description": "Pembuatan dan pengelolaan pesanan" },
+    { "name": "Pembayaran", "description": "Webhook payment gateway" },
+    { "name": "Ops Agent", "description": "Ringkasan keuangan, trafik, dan inventori" }
+  ],
+  "paths": {
+    "/api/categories": {
+      "get": {
+        "tags": ["Katalog"],
+        "summary": "Daftar kategori beserta jumlah produk",
+        "responses": {
+          "200": {
+            "description": "Daftar kategori",
+            "content": {
+              "application/json": {
+                "example": { "data": [ { "id_kategori": 1, "nama_kategori": "Espresso Based", "produk_count": 6 } ] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products": {
+      "get": {
+        "tags": ["Katalog"],
+        "summary": "Daftar menu yang tersedia",
+        "parameters": [
+          { "name": "kategori", "in": "query", "schema": { "type": "string" }, "description": "Nama kategori (persis)" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Cari pada nama atau deskripsi produk" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar produk",
+            "content": {
+              "application/json": {
+                "example": {
+                  "data": [
+                    {
+                      "id_produk": 3,
+                      "id_kategori": 1,
+                      "kode_produk": "ESP-CAP-01",
+                      "nama_produk": "Cappuccino",
+                      "deskripsi": "Espresso dengan steamed milk",
+                      "harga": "28000.00",
+                      "stok": 42,
+                      "status_tersedia": true,
+                      "url_gambar": "/storage/produk/cappuccino.jpg",
+                      "kategori": { "id_kategori": 1, "nama_kategori": "Espresso Based" }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/products/{kode_produk}": {
+      "get": {
+        "tags": ["Katalog"],
+        "summary": "Detail satu produk berdasarkan kode produk",
+        "parameters": [
+          { "name": "kode_produk", "in": "path", "required": true, "schema": { "type": "string" }, "example": "ESP-CAP-01" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detail produk",
+            "content": { "application/json": { "example": { "data": { "id_produk": 3, "kode_produk": "ESP-CAP-01", "nama_produk": "Cappuccino", "harga": "28000.00", "stok": 42 } } } }
+          },
+          "404": { "description": "Kode produk tidak ditemukan" }
+        }
+      }
+    },
+    "/api/orders": {
+      "post": {
+        "tags": ["Pesanan"],
+        "summary": "Buat pesanan baru",
+        "description": "Wajib login (sesi). Harga dan stok selalu dihitung ulang di server. Bila pembuatnya pelanggan, field id_pengguna/id_pelanggan/nama_pelanggan dari client diabaikan (anti-spoofing). Pesanan dibuat bersama baris transaksi berstatus menunggu.",
+        "security": [{ "sessionAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/BuatPesananRequest" },
+              "example": {
+                "tipe_pesanan": "dine-in",
+                "id_meja": 4,
+                "id_promo": 1,
+                "tukar_poin": true,
+                "catatan": "Tanpa sedotan",
+                "items": [
+                  { "id_produk": 3, "jumlah": 2, "harga_satuan": 32000, "catatan_item": "Less sugar" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pesanan dibuat",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Pesanan berhasil dibuat.",
+                  "data": {
+                    "id_pesanan": 101,
+                    "nomor_pesanan": "PSN-20261114-A1B2C3",
+                    "tipe_pesanan": "dine-in",
+                    "status_pesanan": "baru",
+                    "total_harga": "71800.00",
+                    "diskon": "2000.00",
+                    "biaya_layanan": "0.00",
+                    "poin_dipakai": 100,
+                    "detail_pesanan": [ { "id_produk": 3, "jumlah": 2, "harga_satuan": "32000.00", "subtotal": "64000.00" } ],
+                    "transaksi": { "subtotal": "71800.00", "total_bayar": "0.00", "status_pembayaran": "menunggu" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Belum login" },
+          "422": { "description": "Validasi gagal, stok tidak cukup, harga di bawah harga dasar, atau promo kedaluwarsa" }
+        }
+      },
+      "get": {
+        "tags": ["Pesanan"],
+        "summary": "Daftar pesanan (kasir/barista)",
+        "security": [{ "sessionAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["baru", "diproses", "selesai", "dibatalkan"] } }
+        ],
+        "responses": {
+          "200": { "description": "Daftar pesanan terbaru", "content": { "application/json": { "example": { "data": [ { "id_pesanan": 101, "nomor_pesanan": "PSN-20261114-A1B2C3", "status_pesanan": "baru", "detail_pesanan": [] } ] } } } },
+          "401": { "description": "Belum login" },
+          "403": { "description": "Peran tidak diizinkan (hanya kasir/barista)" }
+        }
+      }
+    },
+    "/api/orders/{nomor_pesanan}": {
+      "get": {
+        "tags": ["Pesanan"],
+        "summary": "Detail pesanan berdasarkan nomor pesanan",
+        "security": [{ "sessionAuth": [] }],
+        "parameters": [
+          { "name": "nomor_pesanan", "in": "path", "required": true, "schema": { "type": "string" }, "example": "PSN-20261114-A1B2C3" }
+        ],
+        "responses": {
+          "200": { "description": "Detail pesanan", "content": { "application/json": { "example": { "data": { "nomor_pesanan": "PSN-20261114-A1B2C3", "status_pesanan": "diproses", "total_harga": "71800.00", "detail_pesanan": [] } } } } },
+          "401": { "description": "Belum login" },
+          "403": { "description": "Bukan pesanan milik pengguna" },
+          "404": { "description": "Nomor pesanan tidak ditemukan" }
+        }
+      }
+    },
+    "/api/orders/{id}/status": {
+      "patch": {
+        "tags": ["Pesanan"],
+        "summary": "Ubah status pesanan (state machine)",
+        "description": "Transisi sah: baru → diproses/dibatalkan, diproses → selesai/dibatalkan. Status `selesai` mensyaratkan transaksi sudah lunas. Transisi mundur ditolak.",
+        "security": [{ "sessionAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 101 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["status_pesanan"], "properties": { "status_pesanan": { "type": "string", "enum": ["diproses", "selesai", "dibatalkan"] } } } } }
+        },
+        "responses": {
+          "200": { "description": "Status diperbarui", "content": { "application/json": { "example": { "message": "Status pesanan diperbarui.", "data": { "id_pesanan": 101, "status_pesanan": "diproses" } } } } },
+          "422": { "description": "Transisi tidak diizinkan atau pesanan belum lunas" }
+        }
+      }
+    },
+    "/api/orders/{id}/cancel": {
+      "patch": {
+        "tags": ["Pesanan"],
+        "summary": "Batalkan pesanan",
+        "description": "Mengembalikan stok dan poin secara idempoten, menandai transaksi gagal, serta menyinkronkan status meja. Ditolak bila pesanan sudah selesai atau sudah lunas.",
+        "security": [{ "sessionAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 101 }
+        ],
+        "responses": {
+          "200": { "description": "Pesanan dibatalkan", "content": { "application/json": { "example": { "message": "Pesanan dibatalkan, stok & poin dikembalikan.", "data": { "status_pesanan": "dibatalkan" } } } } },
+          "422": { "description": "Pesanan terminal atau sudah dibayar" }
+        }
+      }
+    },
+    "/api/midtrans/callback": {
+      "post": {
+        "tags": ["Pembayaran"],
+        "summary": "Webhook notifikasi pembayaran Midtrans",
+        "description": "Bebas CSRF. Signature diverifikasi dengan SHA-512(order_id + status_code + gross_amount + server_key) memakai perbandingan waktu-tetap. Idempoten: pesanan yang sudah lunas tidak diproses ulang.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": { "order_id": "PSN-20261114-A1B2C3-1763000000", "status_code": "200", "gross_amount": "71800.00", "signature_key": "<sha512>", "transaction_status": "settlement", "payment_type": "qris" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Notifikasi diterima", "content": { "application/json": { "example": { "status": "OK", "payment_status": "lunas" } } } },
+          "400": { "description": "Payload tidak lengkap" },
+          "403": { "description": "Signature tidak valid" },
+          "404": { "description": "Pesanan tidak ditemukan" },
+          "500": { "description": "Midtrans belum dikonfigurasi atau gagal memproses" }
+        }
+      }
+    },
+    "/api/v1/ops/financial-summary": {
+      "get": {
+        "tags": ["Ops Agent"],
+        "summary": "Ringkasan keuangan hari ini",
+        "responses": {
+          "200": {
+            "description": "Ringkasan finansial",
+            "content": {
+              "application/json": {
+                "example": { "today_revenue": 1850000, "revenue_vs_yesterday_pct": 12.4, "aggregated_gross_margin_pct": 75.0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ops/traffic-telemetry": {
+      "get": {
+        "tags": ["Ops Agent"],
+        "summary": "Telemetri trafik pesanan dan rekomendasi staf",
+        "responses": {
+          "200": {
+            "description": "Telemetri trafik hari ini",
+            "content": {
+              "application/json": {
+                "example": { "total_tickets": 48, "avg_prep_time_seconds": 228, "peak_window": "08:00-10:00", "recommendation": "+1 floor lead for 08:30 rush window" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/alerts": {
+      "get": {
+        "tags": ["Ops Agent"],
+        "summary": "Alert stok biji di bawah ambang",
+        "responses": {
+          "200": {
+            "description": "Array alert (kosong bila semua aman)",
+            "content": {
+              "application/json": {
+                "example": [ { "item": "Arabika Gayo", "remaining_kg": 2.5, "threshold_kg": 5.0, "estimated_depletion": "2026-11-15T09:30:00" } ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/inventory/reorder": {
+      "post": {
+        "tags": ["Ops Agent"],
+        "summary": "Dispatch reorder ke roastery",
+        "description": "Menambah stok lokal, memanggil webhook roastery bila dikonfigurasi, dan mencatat ke tabel log_reorder. Kegagalan webhook tidak menggagalkan pencatatan.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["destination", "item", "order_quantity_kg"],
+                "properties": {
+                  "destination": { "type": "string", "maxLength": 255, "example": "Roastery Dispatch #01" },
+                  "item": { "type": "string", "maxLength": 255, "example": "Arabika Gayo" },
+                  "order_quantity_kg": { "type": "number", "minimum": 0.1, "maximum": 1000, "example": 20 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reorder didispatch",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Reorder berhasil didispatch.",
+                  "data": { "item": "Arabika Gayo", "destination": "Roastery Dispatch #01", "order_quantity_kg": 20, "remaining_kg": 22.5, "webhook_status": "no_webhook_configured", "response_reference": null }
+                }
+              }
+            }
+          },
+          "404": { "description": "Item tidak ditemukan di inventori" },
+          "422": { "description": "Validasi gagal" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionAuth": { "type": "apiKey", "in": "cookie", "name": "laravel_session", "description": "Sesi login berbasis cookie (Blade/session guard Laravel)." }
+    },
+    "schemas": {
+      "BuatPesananRequest": {
+        "type": "object",
+        "required": ["tipe_pesanan", "items"],
+        "properties": {
+          "tipe_pesanan": { "type": "string", "enum": ["dine-in", "takeaway", "delivery"] },
+          "id_meja": { "type": "integer", "nullable": true, "description": "Wajib bila tipe_pesanan=dine-in" },
+          "id_promo": { "type": "integer", "nullable": true },
+          "id_metode": { "type": "integer", "nullable": true },
+          "id_pengguna": { "type": "integer", "nullable": true, "description": "Diabaikan bila pembuat adalah pelanggan" },
+          "id_pelanggan": { "type": "integer", "nullable": true },
+          "nama_pelanggan": { "type": "string", "nullable": true, "maxLength": 255 },
+          "nomor_telepon": { "type": "string", "nullable": true, "maxLength": 20 },
+          "catatan": { "type": "string", "nullable": true, "maxLength": 500 },
+          "tukar_poin": { "type": "boolean", "nullable": true },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id_produk", "jumlah"],
+              "properties": {
+                "id_produk": { "type": "integer" },
+                "jumlah": { "type": "integer", "minimum": 1, "maximum": 99 },
+                "harga_satuan": { "type": "number", "nullable": true, "description": "Tidak boleh di bawah harga dasar produk" },
+                "catatan_item": { "type": "string", "nullable": true, "maxLength": 255 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
