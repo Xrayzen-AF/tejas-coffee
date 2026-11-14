@@ -1,178 +1,63 @@
-# Bank Soal & Strategi Pertanggungjawaban Individu
+### 8. S4-08: BANK SOAL & STRATEGI PERTANGGUNGJAWABAN INDIVIDU (TECHNICAL DEFENSE)
 
-Sepuluh pertanyaan wajib yang disesuaikan dengan kode **Tejas Coffee POS**.
-Semua rujukan berkas benar-benar ada di repositori, sehingga saat penguji meminta
-"tunjukkan baris kodenya", Anda bisa langsung membukanya.
+Asesor industri akan mengajukan pertanyaan mendalam untuk memastikan siswa tidak sekadar menjiplak kode (_copy-paste_). Berikut adalah 10 pertanyaan teknis yang wajib dikuasai:
 
-**Aturan menjawab:** 45 detik per jawaban, sebutkan nama berkas, dan tawarkan
-untuk menunjukkan kode. Jangan menghafal kata per kata — hafalkan alurnya.
+#### Q1: "Dua kasir menjual menu terakhir pada detik yang sama. Bagaimana sistem Anda mencegah stok menjadi minus?"
 
----
+-   **Jawaban Standar Siswa:**
 
-## Q1. "Dua kasir menjual croissant terakhir di detik yang sama. Bagaimana sistem Anda mencegah stok minus?"
+_Pada saat checkout, stok tidak dihitung di browser, melainkan dikunci di basis data. Kami membungkus prosesnya dengan `DB::transaction` dan memanggil `lockForUpdate()` pada baris produk, sehingga baris itu terkunci sampai transaksi selesai. Kasir kedua akan menunggu, membaca stok terbaru, lalu ditolak dengan pesan stok tidak mencukupi. Kami juga menjumlahkan stok lintas varian sebelum item masuk keranjang, agar satu menu tidak bisa dipesan melebihi sisanya._
 
-> "Stok dikurangi di dalam `DB::transaction` dengan `lockForUpdate()`, jadi baris
-> produk terkunci sampai transaksi selesai. Kasir kedua akan menunggu, lalu
-> membaca stok terbaru dan ditolak dengan pesan stok tidak mencukupi. Kami juga
-> menghitung stok gabungan lintas varian sebelum item masuk keranjang."
+#### Q2: "Mengapa Anda menggunakan Database Transaction (BEGIN ... COMMIT / ROLLBACK) pada alur checkout?"
 
-**Bukti:** `app/Http/Controllers/OrderController.php` (method `store`),
-`app/Models/Produk.php`, tes `tests/Feature/CustomerOrderFlowTest.php`.
+-   **Jawaban Standar Siswa:**
 
-**Pertanyaan lanjutan yang mungkin:** *"Kenapa tidak cukup cek stok di JavaScript?"*
-→ "Karena dua browser bisa mengirim request bersamaan. Validasi klien hanya untuk
-kenyamanan; kebenaran data harus di server dan di dalam transaksi DB."
+_Karena satu kali checkout menyentuh beberapa tabel sekaligus: `pesanan`, `detail_pesanan`, `transaksi`, `produk` untuk stok, dan `pelanggan` untuk poin loyalitas. Jika server mati atau listrik padam di tengah proses, `ROLLBACK` menjamin tidak ada pesanan menggantung tanpa tagihan dan tidak ada stok yang terpotong percuma, sehingga prinsip ACID terpenuhi. Perhitungan uang memakai `bcmath` (`bcadd`, `bcmul`) supaya tidak ada selisih pembulatan rupiah._
 
----
+#### Q3: "Bagaimana Anda mengamankan password pengguna di basis data?"
 
-## Q2. "Mengapa checkout memakai transaksi basis data dan `bcmath`?"
+-   **Jawaban Standar Siswa:**
 
-> "Checkout menyentuh beberapa tabel sekaligus: `pesanan`, `detail_pesanan`,
-> `transaksi`, `produk` (stok), dan `pelanggan` (poin). Kalau listrik padam di
-> tengah proses, `ROLLBACK` menjamin tidak ada pesanan menggantung tanpa tagihan.
-> Perhitungan uang memakai `bcmath`, bukan float, supaya tidak ada selisih
-> pembulatan pada nilai rupiah."
+_Password disimpan sebagai hash satu arah Bcrypt dengan salt acak bawaan Laravel, dengan `BCRYPT_ROUNDS` di berkas konfigurasi. Kami tidak pernah menyimpan password dalam bentuk teks terbuka, dan verifikasi memakai `Hash::check` sehingga bahkan administrator basis data tidak dapat membaca password asli. Login juga dibatasi `throttle:10,1` agar tidak bisa ditebak berulang kali._
 
-**Bukti:** `OrderController@store`, `Pesanan::batalkan()` (rollback stok & poin).
+#### Q4: "Tunjukkan bagaimana sistem Anda mencegah serangan SQL Injection!"
 
----
+-   **Jawaban Standar Siswa:**
 
-## Q3. "Bagaimana password pengguna diamankan?"
+_(Membuka `app/Http/Controllers/ProductController.php`)_ _Seluruh query memakai Eloquent atau Query Builder dengan parameter binding, sehingga input pengguna tidak pernah dirangkai menjadi perintah SQL. Contohnya filter pencarian produk dikirim sebagai parameter terikat, bukan disambung ke string query. Karakter kutip tunggal diperlakukan sebagai teks biasa. Satu-satunya `raw` yang kami pakai hanya ekspresi tanggal dan agregat internal, tidak pernah menerima input pengguna._
 
-> "Kami tidak pernah menyimpan password asli. Laravel menyimpannya sebagai hash
-> Bcrypt satu arah dengan salt otomatis (`BCRYPT_ROUNDS=12`). Verifikasi memakai
-> `Hash::check`, jadi bahkan admin database tidak bisa membaca password pengguna.
-> Login dibatasi `throttle:10,1` untuk mencegah percobaan berulang."
+#### Q5: "Apa yang membedakan validasi di browser (HTML) dengan validasi di server (PHP)?"
 
-**Bukti:** `app/Http/Controllers/Auth/LoginController.php`, `phpunit.xml`.
+-   **Jawaban Standar Siswa:**
 
----
+_Validasi HTML hanya untuk kenyamanan tampilan agar form tidak terkirim kosong, dan sangat mudah ditembus dengan mematikan JavaScript atau mengirim request langsung lewat Postman. Karena itu validasi utama berada di server memakai `$request->validate()` dan aturan validasi di controller. Contoh nyatanya, bila client mengirim `harga_satuan` lebih rendah dari harga dasar produk, server menolak dengan status 422 sehingga tidak mungkin memesan kopi seharga satu rupiah._
 
-## Q4. "Tunjukkan bagaimana sistem mencegah SQL Injection!"
+#### Q6: "Bagaimana sistem Anda mencegah kebocoran file berbahaya saat pengguna mengunggah berkas?"
 
-> "Semua query memakai Eloquent atau Query Builder dengan parameter binding,
-> sehingga input pengguna tidak pernah dirangkai menjadi perintah SQL. Contohnya
-> filter pencarian produk memakai `where('nama_produk','like',"%{$search}%")`
-> yang dikirim sebagai parameter terikat. Tidak ada `DB::raw` yang menerima input
-> pengguna."
+-   **Jawaban Standar Siswa:**
 
-**Bukti:** `app/Http/Controllers/ProductController.php`.
+_Kami menerapkan whitelist tipe berkas yang ketat hanya untuk gambar, yaitu `jpeg`, `png`, `jpg`, `webp`, `gif`, dan `avif`, membatasi ukuran maksimal 5 MB, lalu membangun ulang nama berkas menjadi nama unik sebelum disimpan. Berkas diletakkan di direktori storage, bukan direktori publik yang bisa dieksekusi, sehingga penyerang tidak bisa menanam skrip backdoor lewat nama atau ekstensi. Perlu dicatat, bukti pembayaran tidak diunggah sebagai berkas: kasir mencatat nomor referensi dan nama bank atau e-wallet, sehingga tidak ada permukaan unggahan tambahan._
 
-**Catatan kejujuran teknis:** kalau penguji menemukan `selectRaw`, jelaskan bahwa
-yang di-`raw` hanya ekspresi tanggal/agregat internal, bukan input pengguna.
+#### Q7: "Jelaskan struktur tabel basis data Anda dan buktikan bahwa skema tersebut sudah memenuhi bentuk normal ketiga (3NF)!"
 
----
+-   **Jawaban Standar Siswa:**
 
-## Q5. "Apa beda validasi di browser dengan validasi di server?"
+_(Membuka diagram ERD di `docs/03-technical/TECHNICAL_DOCS.md`)_ _Keempat belas tabel memiliki primary key tunggal, sehingga memenuhi 1NF. Seluruh kolom non-kunci bergantung penuh pada primary key dan bukan sebagian kunci, sehingga 2NF terpenuhi; contohnya `detail_pesanan` memakai `id_detail` dan semua kolomnya bergantung pada kunci itu. Tidak ada ketergantungan transitif, sehingga 3NF terpenuhi: nama kategori tidak disimpan di `produk` melainkan di tabel `kategori` yang dirujuk `id_kategori`, data pelanggan dipisah dari tabel `pengguna`, dan detail pembayaran dipisah ke tabel `transaksi` yang berelasi satu-satu dengan `pesanan`. Kolom `harga_satuan` di detail pesanan bukan duplikasi yang melanggar 3NF, melainkan snapshot nilai transaksi saat itu agar laporan lama tidak berubah ketika harga menu naik._
 
-> "Validasi HTML hanya untuk kenyamanan tampilan dan mudah ditembus dengan
-> Postman atau mematikan JavaScript. Validasi utama ada di server memakai
-> `$request->validate()`. Contoh nyata: kalau client mengirim `harga_satuan`
-> lebih rendah dari harga dasar produk, server menolak dengan 422 — jadi tidak
-> mungkin memesan kopi seharga Rp 1."
+#### Q8: "Apa yang terjadi jika koneksi internet terputus mendadak saat demo berlangsung?"
 
-**Bukti:** `OrderController@store` (blok *Floor: harga kiriman tak boleh di bawah
-harga dasar*).
+-   **Jawaban Standar Siswa:**
 
----
+_Kami menyiapkan mitigasi kontingensi offline. Di laptop sudah tersedia skrip `serve-lan.bat` yang menjalankan server Laravel pada `0.0.0.0` sehingga seluruh perangkat di WiFi yang sama dapat mengaksesnya lewat IP laptop; basis data dan aset ada di laptop, jadi sistem tetap berjalan penuh. Bila perangkat bermasalah, kami memutar video cadangan dan menunjukkan laporan A4 yang sudah dicetak. Satu-satunya fitur yang benar-benar butuh internet adalah pembayaran Midtrans, dan alur tunai tetap bisa didemokan._
 
-## Q6. "Bagaimana keamanan unggahan gambar produk dan bukti pembayaran?"
+#### Q9: "Bagaimana pembagian peran kerja di antara kalian berdua selama pengerjaan proyek ini?"
 
-> "Berkas dibatasi pada tipe gambar yang diizinkan dan ukuran maksimal, lalu nama
-> aslinya dibangun ulang menjadi nama unik. Tujuannya mencegah penyerang menyisipkan
-> skrip berbahaya lewat nama/ekstensi berkas. Berkas disimpan di storage, bukan di
-> direktori publik yang bisa dieksekusi."
+-   **Jawaban Standar Siswa:**
 
-**Bukti:** `app/Http/Controllers/Admin/MasterProdukController.php`,
-konfigurasi `filesystems` di `config/filesystems.php`.
+_Saya (Siswa 1) bertanggung jawab atas analisis kebutuhan, perancangan antarmuka Blade dan Tailwind, alur pemesanan pelanggan dari QR meja sampai keranjang, serta penyusunan manual pengguna. Rekan saya (Siswa 2) bertanggung jawab atas skema basis data, controller transaksi, integrasi Midtrans, keamanan, dan API operasional. Seluruh kolaborasi tercatat transparan pada commit log repositori Git, dan kami masing-masing mampu menjelaskan bagian rekan._
 
----
+#### Q10: "Jika aplikasi ini benar-benar diterapkan di cafe mitra, apa kendala operasional terbesar dan bagaimana solusinya?"
 
-## Q7. "Buktikan skema database Anda sudah 3NF!"
+-   **Jawaban Standar Siswa:**
 
-> "Semua tabel punya primary key tunggal (1NF). Kolom non-kunci bergantung penuh
-> pada PK (2NF) — contohnya `detail_pesanan` memakai `id_detail` dan seluruh
-> kolomnya bergantung pada kunci itu. Tidak ada ketergantungan transitif (3NF):
-> nama kategori tidak disimpan di `produk` (cukup `id_kategori`), data member
-> dipisah dari `pengguna`, dan detail pembayaran dipisah ke `transaksi` yang
-> berelasi 1:1 dengan `pesanan`."
-
-**Bukti:** `database/migrations/*`, diagram ERD di `docs/03-technical/TECHNICAL_DOCS.md` §2.
-
-**Pertanyaan jebakan:** *"Bukankah `harga_satuan` di detail pesanan duplikasi
-data produk?"* → "Bukan. Itu **snapshot** nilai transaksi saat itu, sehingga
-perubahan harga menu tidak mengubah laporan historis. Duplikasi data referensi
-yang dilarang 3NF berbeda dengan pencatatan nilai historis."
-
----
-
-## Q8. "Kalau internet ruang ujian diputus saat demo, apa yang terjadi?"
-
-> "Kami punya dua jalur. Pertama, server lokal LAN lewat `serve-lan.bat` yang
-> diakses dari HP penguji melalui IP laptop pada WiFi yang sama — seluruh fitur
-> tetap jalan karena database ada di laptop. Kedua, video cadangan tiga menit dan
-> laporan A4 tercetak bila perangkat bermasalah. Satu-satunya fitur yang butuh
-> internet adalah pembayaran Midtrans; alur tunai tetap bisa didemokan."
-
-**Bukti:** `docs/08-deployment/DEPLOYMENT.md`, `docs/08-deployment/serve-lan.bat`.
-
----
-
-## Q9. "Bagaimana pembagian kerja kalian, dan apa buktinya?"
-
-> "Siswa 1 menangani analisis kebutuhan, antarmuka Blade/Tailwind, alur pemesanan
-> pelanggan, dan seluruh dokumentasi pengguna. Siswa 2 menangani skema basis data,
-> controller transaksi, integrasi Midtrans, keamanan, dan API. Buktinya riwayat
-> commit di Git — setiap commit menyebut modul yang dikerjakan — dan kami saling
-> bisa menjelaskan bagian rekan."
-
-**Bukti:** `git log --oneline`, pembagian pada `README.md` §Anggota Tim.
-
-**Penting:** penguji sering minta Anda menjelaskan bagian rekan. Siapkan jawaban
-untuk minimal satu fitur milik rekan Anda.
-
----
-
-## Q10. "Kalau aplikasi ini dipakai cafe sungguhan, apa kendala operasional terbesar dan solusinya?"
-
-> "Kendalanya literasi digital staf dan keengganan pelanggan memindai QR. Solusi
-> yang sudah kami terapkan: (1) antarmuka kasir satu layar dengan tombol besar dan
-> istilah Indonesia, (2) fallback pesanan lewat kasir bila pelanggan tidak mau scan,
-> (3) kode booking manual bila kamera gagal, dan (4) geofence bisa dimatikan admin
-> saat kondisi lapangan tidak mendukung. Rencana berikutnya adalah notifikasi
-> WhatsApp untuk pelanggan."
-
-**Bukti:** `docs/03-manual/USER_MANUAL.md` Bab II Langkah 1, `SettingController@updateGeofence`.
-
----
-
-## Pertanyaan Tambahan yang Sering Muncul
-
-| Pertanyaan | Arah jawaban |
-| :--- | :--- |
-| "Kenapa omzet laporan memakai `subtotal`, bukan `total_bayar`?" | `total_bayar` memuat uang fisik yang diserahkan; kembalian bukan pendapatan. Uang diterima dan kembalian dilaporkan terpisah. |
-| "Bagaimana struk dicegah dibuka orang lain?" | `PesananPolicy` memeriksa pemilik atau peran kasir/admin — anti-IDOR. |
-| "Bagaimana webhook Midtrans dipalsukan?" | Signature SHA-512 diverifikasi dengan `hash_equals` sebelum status diubah. |
-| "Kenapa QR meja memakai token, bukan ID?" | Token acak 40 karakter agar URL meja tidak bisa ditebak atau dipakai ulang. |
-| "Bagaimana meja kembali kosong sendiri?" | Command `meja:bersihkan` tiap menit + `Pesanan::sinkronMeja()` saat status berubah. |
-| "Kenapa geofence diverifikasi di server?" | Koordinat dikirim ke backend dan dihitung dengan rumus Haversine; mengubah JavaScript tidak melewatinya. |
-| "Kalau pesanan dibatalkan setelah bayar?" | Ditolak dengan 422; refund dilakukan kasir secara manual — keputusan desain yang kami sebutkan di batas lingkup. |
-| "Apa yang belum dikerjakan?" | Notifikasi WhatsApp, PWA offline, dan settlement otomatis — tercantum di slide *Out of Scope*. |
-
-## Simulasi Live Debugging (latihan 5 menit)
-
-Minta rekan/guru merusak **satu** baris berikut, lalu perbaiki sambil menjelaskan:
-
-1. Ubah `Pesanan::TRANSISI_STATUS['baru']` agar `selesai` diizinkan → tunjukkan tes gagal, kembalikan.
-2. Hapus `lockForUpdate()` pada query produk → jelaskan risikonya.
-3. Ubah `where('status_pembayaran','lunas')` menjadi `menunggu` pada laporan → angka omzet jadi nol.
-4. Ganti `hash_equals` dengan `==` pada webhook → jelaskan risiko *timing attack*.
-5. Hapus middleware `geofence` dari grup rute pelanggan → halaman terbuka dari luar radius.
-
-Setelah setiap perbaikan, jalankan hanya tes terkait:
-
-```bash
-php artisan test --filter=CustomerOrderFlowTest
-php artisan test --filter=AdminSalesReportTest
-php artisan test --filter=GeofenceTest
-```
+_Kendala terbesar adalah literasi digital staf senior dan keengganan sebagian pelanggan memindai QR. Solusi yang sudah kami terapkan: antarmuka kasir satu layar dengan tombol besar dan istilah bahasa Indonesia, jalur cadangan pesanan lewat kasir bila pelanggan tidak mau memindai, kode booking manual bila kamera gagal, serta geofence yang bisa dinonaktifkan admin saat kondisi lapangan tidak mendukung. Rencana berikutnya adalah notifikasi WhatsApp untuk pelanggan dan mode PWA agar halaman tetap terbuka saat sinyal lemah._
