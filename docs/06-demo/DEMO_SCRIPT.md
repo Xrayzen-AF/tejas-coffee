@@ -1,6 +1,6 @@
 # Naskah Gladi Bersih & Live Demo
 
-Total +/-33 menit: **10 menit pitching (10 slide)**, **8 menit demo aplikasi**, **15 menit tanya-jawab**.
+Total ±33 menit: **10 menit pitching (10 slide)**, **8 menit demo aplikasi**, **15 menit tanya-jawab**.
 Semua langkah di bawah sudah diuji; jangan menambah langkah baru saat hari-H.
 
 ## Persiapan 10 Menit Sebelum Masuk
@@ -21,7 +21,7 @@ Wajib: **jangan pernah** menjalankan `migrate:fresh` setelah demo dimulai.
 
 ---
 
-## Segmen 1 — Pitching 7 Menit
+## Segmen 1 — Pitching 10 Menit (10 Slide)
 
 | Waktu | Slide | Poin yang diucapkan |
 | :--- | :---: | :--- |
@@ -29,12 +29,13 @@ Wajib: **jangan pernah** menjalankan `migrate:fresh` setelah demo dimulai.
 | 0:30–1:15 | 2 | Empat masalah lapangan: antrean, stok tidak sinkron, rekap manual, meja tidak terpantau |
 | 1:15–2:00 | 3 | Persona Rani (pelanggan) dan Pak Bagas (pemilik/kasir) |
 | 2:00–2:45 | 4 | Enam solusi utama |
-| 2:45–3:15 | 5 | Batas lingkup dan alasan mengapa sesuatu tidak dikerjakan |
+| 2:45–3:15 | 5 | Batas lingkup + grafik alokasi 72% in-scope / 28% out |
 | 3:15–4:00 | 6 | Arsitektur MVC, 14 tabel 3NF, 138 tes |
-| 4:00–5:00 | 7–8 | Anti-oversell dengan row lock; laporan penjualan yang bisa dipertanggungjawabkan |
-| 5:00–5:45 | 9 | Hasil QA & keamanan |
-| 5:45–6:30 | 10–11 | Dampak dan rencana keberlanjutan |
-| 6:30–7:00 | 12 | Ajakan demo + akun uji coba |
+| 4:00–5:00 | 7 | Anti-oversell: row lock SELECT ... FOR UPDATE dan bcmath |
+| 5:00–5:45 | 8 | Hasil QA & keamanan: 138 tes, PesananPolicy, signature webhook |
+| 5:45–6:30 | 9 | Dampak dan rencana keberlanjutan |
+| 6:30–7:00 | 10 | Ajakan demo + akun uji coba |
+| 7:00–10:00 | — | Cadangan: transisi slide, pertanyaan sisipan, atau memperpanjang slide 7 (demo kode) |
 
 Kalimat pembuka yang disarankan: *"Kami membangun sistem pemesanan coffee shop
 yang menyatukan meja, kasir, barista, dan laporan pemilik dalam satu sumber data.
