@@ -1,6 +1,6 @@
 # Naskah Gladi Bersih & Live Demo
 
-Total ±33 menit: **10 menit pitching (10 slide)**, **8 menit demo aplikasi**, **15 menit tanya-jawab**.
+Total ±35 menit: **10 menit pitching (10 slide)**, **10 menit demo aplikasi**, **15 menit tanya-jawab**.
 Semua langkah di bawah sudah diuji; jangan menambah langkah baru saat hari-H.
 
 ## Persiapan 10 Menit Sebelum Masuk
@@ -43,7 +43,9 @@ Demo akan kami mulai dari pelanggan yang memesan lewat QR meja."*
 
 ---
 
-## Segmen 2 — Live Demo 8 Menit (skenario peran)
+## Segmen 2 — Live Demo 10 Menit (skenario peran)
+
+> Protokol role-play 4 skenario: [`S4-07_protokol-gladi-bersih-dan-live-demo.md`](S4-07_protokol-gladi-bersih-dan-live-demo.md). Langkah 2.1–2.4 memakai 8 menit, sisa 2 menit untuk Skenario 2 (pembuktian anti-oversell) dan tanya sisipan.
 
 ### 2.1 Pelanggan memesan dari meja (2 menit) — Tab A
 
