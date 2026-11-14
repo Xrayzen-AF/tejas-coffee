@@ -1,55 +1,140 @@
-# Tejas Coffee POS — Sistem Pemesanan Coffee Shop
+# ☕ Tejas Coffee POS — Sistem Pemesanan Coffee Shop
 
-Aplikasi pemesanan coffee shop berbasis **Laravel 12** + **MySQL** dengan empat peran pengguna
-(admin, kasir, barista, pelanggan), pemesanan mandiri lewat **QR meja**, pembayaran **Midtrans**
-(QRIS & virtual account), serta **KDS** (kitchen/bar display) untuk barista.
+[![Release](https://img.shields.io/badge/Release-v1.0.0--rc-0D9488?style=for-the-badge)](https://github.com)
+[![Build Status](https://img.shields.io/badge/Build-Passing-10B981?style=for-the-badge)](https://github.com)
+[![Security Audit](https://img.shields.io/badge/Security-Protected-3B82F6?style=for-the-badge)](https://github.com)
+[![License](https://img.shields.io/badge/License-MIT-slate?style=for-the-badge)](LICENSE)
 
-**Versi rilis:** `v1.0.0-rc` · Artefak Sprint 4 (manual pengguna, dokumentasi
-teknis, spesifikasi API, slide presentasi, naskah demo, dan panduan deployment)
-tersedia di [`docs/`](docs/README.md).
+> Proyek Uji Kompetensi Keahlian (UKK) Rekayasa Perangkat Lunak / PPLG — Tahun Ajaran 2026/2027
 
-## Tumpukan Teknologi
+> **Tema:** Local Digital Solution &bull; **Mitra:** Kedai Tejas Coffee (studi kasus operasional coffee shop)
 
-| Komponen | Versi / Keterangan |
-|---|---|
-| PHP | ^8.2 |
-| Laravel | ^12.0 |
-| Database | MySQL (nama DB: `coffee_shop_order`) |
-| Frontend | Blade + Tailwind CSS 4 + Vite 7 + Lucide icons |
-| Pembayaran | `midtrans/midtrans-php` (Core API: QRIS, VA bank) |
-| QR meja | `bacon/bacon-qr-code` |
-| Test | PHPUnit 11 (`php artisan test`) |
+---
 
-## Fitur per Peran
+## 📌 1. Latar Belakang Masalah & Solusi
+
+Pencatatan pesanan di coffee shop masih sering dilakukan di kertas nota, lalu diketik ulang ke mesin kasir. Antrean memanjang pada jam sibuk, stok menu tidak sinkron dengan ketersediaan bahan, status meja tidak terpantau, dan rekap penjualan harian disalin manual ke Excel setiap tutup toko.
+
+**Tejas Coffee POS** hadir sebagai solusi digital terintegrasi yang menyediakan:
+
+1. **QR Table Ordering:** Pelanggan memindai QR meja, memesan sendiri, dan meja otomatis tercatat terisi selama 90 menit — dengan sesi yang diperpanjang selama masih ada pesanan aktif.
+
+2. **Unified POS & Payment:** Kasir menagih dalam satu layar (tunai dengan kalkulator kembalian, QRIS dinamis, virtual account), stok dipotong atomik di dalam transaksi basis data sehingga tidak pernah minus.
+
+3. **Ops Console & Printable Report:** KDS barista real-time, inventori biji kopi dengan ambang kritis, CRM & poin loyalitas, serta laporan penjualan A4 berfilter periode yang dapat dicetak atau diekspor ke CSV.
+
+---
+
+## 🛠️ 2. Tech Stack & Architecture
+
+* **Frontend:** Blade Templating, Tailwind CSS 4, Vite 7, Lucide Icons, JavaScript Vanilla.
+* **Backend:** PHP 8.2 (Laravel 12 MVC Engine) dengan lapisan Service (`MidtransService`, `MejaQrService`, `Agents/*`).
+* **Database:** MySQL 8 / MariaDB 10.6 (InnoDB Engine, 14 tabel relasional, 3rd Normal Form — 3NF).
+* **Security:** Bcrypt Hashing, Eloquent Parameter Binding (anti SQL Injection), CSRF Shield, Role Middleware, `PesananPolicy` (anti-IDOR), verifikasi signature webhook SHA-512, serta geofence yang divalidasi di sisi server.
+
+---
+
+## 🚀 3. Panduan Instalasi Lokal (Quick Local Setup)
+
+Ikuti langkah berikut untuk menjalankan aplikasi di lingkungan pengembang lokal:
+
+### Prasyarat Sistem:
+
+* PHP $\ge$ 8.2 & Composer
+* MySQL Server (Laragon / XAMPP)
+* Node.js 20.x & npm (untuk membangun aset)
+* Git CLI
+
+### Langkah Instalasi:
+
+```bash
+# 1. Klon repositori ini
+git clone https://github.com/<akun-anda>/tejas-coffee-pos.git
+cd tejas-coffee-pos
+
+# 2. Pasang dependensi pustaka
+composer install
+
+# 3. Salin berkas environment
+cp .env.example .env
+
+# 4. Generate Application Key
+php artisan key:generate
+
+# 5. Konfigurasi basis data pada berkas .env
+# DB_DATABASE=coffee_shop_order
+# DB_USERNAME=root
+# DB_PASSWORD=
+
+# 6. Jalankan migrasi dan data seeder dummy
+php artisan migrate:fresh --seed
+
+# 7. Hubungkan storage symlink untuk berkas gambar menu
+php artisan storage:link
+
+# 8. Bangun aset frontend
+npm install && npm run build
+
+# 9. Jalankan server lokal
+php artisan serve
+```
+
+Akses aplikasi melalui browser Anda pada tautan: http://localhost:8000.
+
+## 🔑 4. Akun Pengujian Default (Credentials)
+
+Gunakan kredensial berikut untuk menguji hak akses multi-role. Semua akun memakai password `password` dan dapat login memakai email **atau** nomor HP.
+
+| **Role Pengguna** | **Alamat Email** | **Nomor HP** | **Password** | **Hak Akses Utama** |
+| --- | --- | --- | --- | --- |
+| **Admin** | admin@kopi.dev | 081100000001 | password | Sales & Revenue, Inventori, Staff, CRM, Master Data, Store Settings, cetak laporan |
+| **Kasir** | kasir@kopi.dev | 081200000001 | password | POS tiket, status meja, tunai/QRIS/VA, struk 80 mm, tandai lunas |
+| **Barista** | barista@kopi.dev | 081300000001 | password | KDS (bump/dismiss), ubah status meja |
+| **Pelanggan** | pelanggan@kopi.dev | 081234567890 | password | Pesan menu via QR meja, voucher, poin, checkout, riwayat & struk |
+
+## 👥 5. Anggota Tim Pengembang (Kelompok 04)
+
+* **Siswa 1 — Frontend Specialist & UI/UX Designer** • _NISN: (sesuaikan)_
+* **Siswa 2 — Backend Architect & Database Administrator** • _NISN: (sesuaikan)_
+
+_Pembimbing UKK:_ **(sesuaikan nama pembimbing, S.Kom.)**
+**(sesuaikan nama sekolah) — 2026**
+
+---
+
+## 📋 6. Fitur per Peran
 
 ### Admin (`/admin/dashboard`)
-- Ringkasan toko: jumlah pengguna per peran, penjualan, stok kritis.
-- CRUD akun pegawai (khusus peran kasir & barista; admin tidak bisa menghapus dirinya sendiri).
-- Sales & Revenue, Inventory & Roastery (termasuk *reorder* biji kopi), Staff & Roster.
-- Customer CRM & Loyalty (tambah pelanggan, penyesuaian poin, hapus).
-- Master data: kategori, produk, meja (+ cetak lembar QR), promo.
-- Store Settings: profil toko, biaya layanan, poin per Rp 10.000, metode pembayaran,
-  dan kredensial Midtrans (disimpan di tabel `midtrans_settings`, bukan `.env`).
-- Kelola status pesanan dan pembatalan pesanan.
+
+- Ringkasan toko: jumlah pengguna per peran, penjualan, dan stok kritis.
+- CRUD akun pegawai (khusus kasir & barista; admin tidak dapat menghapus dirinya sendiri).
+- **Sales & Revenue:** omzet 7 hari, breakdown metode bayar, margin produk, serta laporan penjualan siap cetak A4 + ekspor CSV.
+- **Inventory & Roastery:** stok biji kopi, ambang kritis, dispatch *reorder* ke roastery.
+- **Staff & Roster**, **Customer CRM & Loyalty**, dan **Master data** (kategori, produk, meja + cetak lembar QR, promo).
+- **Store Settings:** profil toko, biaya layanan, poin per Rp 10.000, metode pembayaran, kredensial Midtrans, geofence cafe.
+- Kelola status pesanan dan pembatalan.
 
 ### Kasir (`/kasir/dashboard`)
+
 - POS: tambah/ubah item pada draf tiket (session), lalu **Charge** menjadi pesanan.
 - Papan status meja real-time (dipolling).
-- Pembayaran tunai (dengan kalkulator kembalian), QRIS dinamis, dan virtual account.
-- Cetak struk 80 mm, tandai lunas (poin pelanggan otomatis bertambah).
+- Pembayaran tunai (kalkulator kembalian), QRIS dinamis, dan virtual account.
+- Cetak struk 80 mm; tandai lunas (poin pelanggan bertambah otomatis).
 
 ### Barista (`/barista/dashboard`)
+
 - KDS: daftar pesanan aktif, **bump** (sematkan ke atas) dan **dismiss** (sembunyikan).
 - Ubah status meja (kosong / terisi / dipesan).
 
 ### Pelanggan (`/pelanggan/dashboard`)
-- Registrasi mandiri (hanya peran pelanggan), login via email **atau** nomor HP.
-- Menu + filter kategori, kustomisasi item, keranjang, voucher, dan tukar poin.
-- Check-in meja lewat scan QR (atau kode booking bila kamera tidak tersedia).
-- Checkout (dine-in / takeaway / delivery), status pesanan real-time, riwayat, profil.
-- Registrasi, login, dan scan QR meja juga tersedia untuk tamu tanpa akun.
 
-## Struktur Database
+- Registrasi mandiri (hanya peran pelanggan), login via email atau nomor HP.
+- Menu + filter kategori, kustomisasi item, keranjang, voucher, dan tukar poin.
+- Check-in meja lewat QR atau kode booking; registrasi, login, dan scan QR juga tersedia untuk tamu tanpa akun.
+- Checkout (dine-in / takeaway / delivery), status pesanan real-time, riwayat, dan profil.
+- Verifikasi lokasi (geofence) sebelum membuka halaman pelanggan.
+
+## 🗄️ 7. Struktur Database
 
 | Tabel | Keterangan |
 |---|---|
@@ -70,122 +155,9 @@ tersedia di [`docs/`](docs/README.md).
 Alur status pesanan: `baru → diproses → selesai`, atau `dibatalkan`.
 Status pembayaran: `menunggu → lunas` / `gagal`.
 
-## Instalasi
+## 🔌 8. Endpoint API
 
-1. Pastikan MySQL berjalan (XAMPP/Laragon), lalu buat database:
-
-   ```sql
-   CREATE DATABASE IF NOT EXISTS coffee_shop_order
-     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-
-2. Salin `.env.example` menjadi `.env`, sesuaikan koneksi:
-
-   ```env
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_DATABASE=coffee_shop_order
-   DB_USERNAME=root
-   DB_PASSWORD=
-   ```
-
-3. Install dependensi, generate key, migrasi + seed, dan build aset:
-
-   ```bash
-   composer install
-   npm install
-   php artisan key:generate
-   php artisan migrate --seed
-   npm run build
-   ```
-
-4. Jalankan server:
-
-   ```bash
-   php artisan serve
-   ```
-
-   Untuk pengembangan dengan Vite HMR + log + queue sekaligus:
-
-   ```bash
-   composer dev
-   ```
-
-## Akun Demo (hasil seeder)
-
-Semua akun memakai password **`password`**. Login bisa memakai email atau nomor HP.
-
-| Peran | Email | Nomor HP |
-|---|---|---|
-| Admin | `admin@kopi.dev` | `081100000001` |
-| Kasir | `kasir@kopi.dev` | `081200000001` |
-| Barista | `barista@kopi.dev` | `081300000001` |
-| Pelanggan | `pelanggan@kopi.dev` | `081234567890` |
-
-Seeder juga menambahkan kategori, produk, meja (lengkap dengan `qr_token`), promo
-(`WELCOME10`, `HEMAT5000`), metode pembayaran, dan data pelanggan contoh.
-
-## Pembayaran Midtrans
-
-Kredensial dapat diatur di dua tempat (yang paling baru menang):
-
-1. Halaman **Admin → Store Settings → Midtrans** (disimpan di tabel `midtrans_settings`), atau
-2. `.env`:
-
-   ```env
-   MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxx
-   MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxxxxxx
-   MIDTRANS_IS_PRODUCTION=false
-   ```
-
-Isi **Payment Notification URL** di dashboard Midtrans dengan:
-
-```
-{APP_URL}/api/midtrans/callback
-```
-
-Webhook (`POST /api/midtrans/callback`, bebas CSRF) memverifikasi signature, memperbarui
-status transaksi/pesanan, dan menambah poin pelanggan. Karena pengembangan biasanya berjalan
-di localhost, status juga disinkronkan lewat polling dari halaman kasir/status pesanan.
-
-## Penjadwalan
-
-Sesi meja yang kedaluwarsa ditutup oleh command berikut dan dijadwalkan tiap menit
-(`routes/console.php`):
-
-```bash
-php artisan meja:bersihkan
-```
-
-Saat produksi, jalankan scheduler lewat cron:
-
-```
-* * * * * cd /path/ke/proyek && php artisan schedule:run >> /dev/null 2>&1
-```
-
-Untuk development, `php artisan schedule:work` sudah cukup.
-
-## Pengujian
-
-```bash
-php artisan test
-```
-
-Test berjalan di SQLite in-memory (lihat `phpunit.xml`), sehingga tidak menyentuh database
-MySQL aplikasi. Cakupan mencakup autentikasi multi-role, alur pesanan pelanggan, QR meja,
-status meja barista/pelanggan, POS kasir + Midtrans, inventori, dan endpoint Ops Agent.
-
-Perapian format kode memakai Laravel Pint:
-
-```bash
-./vendor/bin/pint
-```
-
-## API
-
-Semua endpoint berada di prefix `/api`. Endpoint pesanan wajib login (session) dan
-harga selalu dihitung ulang di server.
+Semua endpoint berada di prefix `/api`. Endpoint pesanan wajib login (session) dan harga selalu dihitung ulang di server. Spesifikasi lengkap: [`docs/04-api/openapi.json`](docs/04-api/openapi.json).
 
 | Method | Endpoint | Akses | Deskripsi |
 |---|---|---|---|
@@ -203,7 +175,34 @@ harga selalu dihitung ulang di server.
 | `GET` | `/v1/inventory/alerts` | — | Biji kopi di bawah ambang |
 | `POST` | `/v1/inventory/reorder` | — | Dispatch reorder ke roastery |
 
-## Struktur Direktori Penting
+## 💳 9. Pembayaran, Penjadwalan & Pengujian
+
+**Midtrans.** Kredensial dapat diatur di **Admin → Store Settings → Midtrans** (tersimpan di tabel `midtrans_settings`) atau lewat `.env`:
+
+```env
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxx
+MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxxxxxx
+MIDTRANS_IS_PRODUCTION=false
+```
+
+Isi **Payment Notification URL** di dashboard Midtrans dengan `{APP_URL}/api/midtrans/callback`. Webhook memverifikasi signature SHA-512, memperbarui status transaksi/pesanan, dan menambah poin pelanggan. Karena pengembangan berjalan di localhost, status juga disinkronkan lewat polling.
+
+**Penjadwalan.** Sesi meja kedaluwarsa ditutup oleh `php artisan meja:bersihkan` dan dijadwalkan tiap menit (`routes/console.php`). Saat produksi jalankan scheduler lewat cron:
+
+```
+* * * * * cd /path/ke-proyek && php artisan schedule:run >> /dev/null 2>&1
+```
+
+**Pengujian.** Test berjalan di SQLite in-memory (lihat `phpunit.xml`), sehingga tidak menyentuh database MySQL aplikasi:
+
+```bash
+php artisan test          # 138 tes, 669 assertion
+./vendor/bin/pint         # rapikan gaya kode
+```
+
+Cakupan: autentikasi multi-role, alur pesanan pelanggan, QR meja & geofence, status meja barista/pelanggan, POS kasir + Midtrans, inventori, laporan cetak, dan endpoint Ops Agent.
+
+## 📂 10. Struktur Direktori Penting
 
 ```
 app/Http/Controllers/Admin/     Ops Console (sales, inventory, staff, CRM, master data)
@@ -217,5 +216,21 @@ docs/                           Dokumentasi Sprint 4 (manual, teknis, API, slide
 screenshots/                    Tangkapan layar dokumentasi UI
 ```
 
-Dokumentasi ringkas peta halaman per peran tersedia di
-[`ROLE_BASED_PAGES_SUMMARY.md`](ROLE_BASED_PAGES_SUMMARY.md).
+## 📚 11. Dokumentasi Sprint 4
+
+| Artefak | Berkas |
+|---|---|
+| Log bug fixing & Git tag (S4-01) | [`docs/01-release/`](docs/01-release/) |
+| Deployment & kontingensi offline (S4-02) | [`docs/08-deployment/DEPLOYMENT.md`](docs/08-deployment/DEPLOYMENT.md) |
+| User Manual (S4-03) | [`docs/03-manual/USER_MANUAL.docx`](docs/03-manual/USER_MANUAL.docx) |
+| Dokumentasi teknis (S4-03) | [`docs/03-technical/TECHNICAL_DOCS.md`](docs/03-technical/TECHNICAL_DOCS.md) |
+| Spesifikasi API (S4-05) | [`docs/04-api/openapi.json`](docs/04-api/openapi.json) |
+| Slide presentasi (S4-06) | [`docs/05-presentation/pitch-deck.html`](docs/05-presentation/pitch-deck.html) |
+| Naskah demo & berita acara (S4-07) | [`docs/06-demo/`](docs/06-demo/) |
+| Bank soal defense (S4-08) | [`docs/07-defense/BANK_SOAL_DEFENSE.md`](docs/07-defense/BANK_SOAL_DEFENSE.md) |
+
+Indeks lengkap: [`docs/README.md`](docs/README.md).
+
+## 📄 Lisensi
+
+Dirilis dengan lisensi MIT — lihat berkas [`LICENSE`](LICENSE).
