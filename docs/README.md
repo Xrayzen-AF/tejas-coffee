@@ -13,7 +13,7 @@ Versi rilis: **v1.0.0-rc** · Basis kode: `main` · Tanggal: 14 November 2026
 | S4-01 | Final Bug Fixing (Release Candidate) | [`01-release/RELEASE_NOTES.md`](01-release/RELEASE_NOTES.md) |
 | S4-01 | Audit akhir Gate 5 | [`01-release/GATE5_CHECKLIST.md`](01-release/GATE5_CHECKLIST.md) |
 | S4-02 | Deployment staging + fallback LAN | [`08-deployment/DEPLOYMENT.md`](08-deployment/DEPLOYMENT.md), [`08-deployment/serve-lan.bat`](08-deployment/serve-lan.bat) |
-| S4-03 | User Manual | [`02-manual/USER_MANUAL.md`](02-manual/USER_MANUAL.md) |
+| S4-03 | User Manual | [`03-manual/USER_MANUAL.md`](03-manual/USER_MANUAL.md) · [`USER_MANUAL.docx`](03-manual/USER_MANUAL.docx) · struktur: [`S4-03_struktur-user-manual.docx`](03-manual/S4-03_struktur-user-manual.docx) |
 | S4-03 | Technical Documentation | [`03-technical/TECHNICAL_DOCS.md`](03-technical/TECHNICAL_DOCS.md) |
 | S4-04 | README repositori | [`../README.md`](../README.md) |
 | S4-05 | API Documentation | [`04-api/openapi.json`](04-api/openapi.json), [`04-api/API_CONTRACT.md`](04-api/API_CONTRACT.md) |

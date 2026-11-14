@@ -142,7 +142,7 @@ untuk minimal satu fitur milik rekan Anda.
 > saat kondisi lapangan tidak mendukung. Rencana berikutnya adalah notifikasi
 > WhatsApp untuk pelanggan."
 
-**Bukti:** `docs/02-manual/USER_MANUAL.md` §2.2, `SettingController@updateGeofence`.
+**Bukti:** `docs/03-manual/USER_MANUAL.md` Bab II Langkah 1, `SettingController@updateGeofence`.
 
 ---
 

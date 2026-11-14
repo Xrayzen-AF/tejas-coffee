@@ -7,7 +7,7 @@ Diisi berdasarkan kondisi repo per **14 November 2026**.
 | :---: | :--- | :---: | :--- |
 | 1 | Code Freeze & Git tag `v1.0.0-rc` terpasang | ✅ | `git tag` → `v1.0.0-rc`; kebijakan freeze di `docs/01-release/RELEASE_NOTES.md` §1 |
 | 2 | Staging cloud aktif & fallback LAN offline siap | ⏳ | Prosedur + skrip `docs/08-deployment/`; URL publik menunggu kredensial hosting |
-| 3 | User Manual & Technical Docs lengkap di `docs/` | ✅ | `docs/02-manual/USER_MANUAL.md`, `docs/03-technical/TECHNICAL_DOCS.md` |
+| 3 | User Manual & Technical Docs lengkap di `docs/` | ✅ | `docs/03-manual/USER_MANUAL.md` (+ versi DOCX), `docs/03-technical/TECHNICAL_DOCS.md` |
 | 4 | `README.md` profesional siap dievaluasi penguji | ✅ | `README.md` (stack, instalasi, akun demo, API, struktur direktori) |
 | 5 | API Documentation / kontrak data terdokumentasi | ✅ | `docs/04-api/openapi.json` + `docs/04-api/API_CONTRACT.md` |
 | 6 | Slide presentasi 10–12 slide matang (pitching 7–10 menit) | ✅ | `docs/05-presentation/pitch-deck.html` (12 slide, siap cetak) |
