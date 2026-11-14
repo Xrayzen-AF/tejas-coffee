@@ -1,40 +1,33 @@
 @echo off
-REM ============================================================
-REM  Tejas Coffee POS - Server Lokal LAN (mode cadangan offline)
-REM  Dipakai bila internet ruang ujian terputus.
-REM  Jalankan dari root proyek, atau lewat pintasan di folder ini.
-REM ============================================================
-setlocal
+title PELUNCUR SERVER DARURAT OFFLINE UKK RPL - TEJAS COFFEE POS
+color 0A
 
+echo ==============================================================
+echo MEMULAI SERVER LOKAL TEJAS COFFEE POS (MODE KONTINJENSI OFFLINE)
+echo ==============================================================
+echo.
+echo Pastikan Laragon / XAMPP (MySQL) telah aktif pada port 3306!
+echo Mendeteksi alamat IP lokal laptop ini...
+
+REM Skrip ini berada di docs\08-deployment\, jadi naik dua tingkat ke root proyek.
 cd /d "%~dp0..\.."
 
-echo.
-echo === Tejas Coffee POS : Server Lokal LAN ===
-echo.
+for /f "tokens=4" %%a in ('route print ^| findstr 0.0.0.0.*0.0.0.0') do set IP=%%a
 
-REM Tampilkan alamat IP agar bisa dibuka dari HP penguji
-echo Alamat IP laptop ini:
-ipconfig | findstr /i "IPv4"
+echo Alamat IP Server Anda: http://%IP%:8000
 echo.
-echo Buka dari HP: http://IP-DI-ATAS:8000
+echo [1/3] Membersihkan Cache Sistem...
+php artisan config:clear
+php artisan route:clear
 echo.
-
-REM Bersihkan cache konfigurasi agar perubahan .env terbaca
-php artisan config:clear >nul 2>&1
-php artisan view:clear >nul 2>&1
-
-echo Menjalankan server pada 0.0.0.0:8000 ...
-echo Tekan Ctrl+C untuk menghentikan server.
+echo [2/3] Membuka Akses Storage Symlink...
+php artisan storage:link
 echo.
+echo [3/3] Menjalankan Server Web Terbuka ke Seluruh Jaringan...
+echo Silakan minta penguji membuka browser: http://%IP%:8000
+echo Tekan CTRL + C untuk menghentikan server.
+echo ==============================================================
 
-php artisan serve --host=0.0.0.0 --port=8000
-
-if errorlevel 1 (
-    echo.
-    echo [GAGAL] Server tidak dapat dijalankan.
-    echo Periksa: PHP terpasang di PATH, dependensi sudah di-install
-    echo ^(composer install^), dan database sudah dimigrasi ^(php artisan migrate --seed^).
-)
+php artisan serve --host 0.0.0.0 --port 8000
 
 pause
-endlocal
