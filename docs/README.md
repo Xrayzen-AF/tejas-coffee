@@ -16,7 +16,7 @@ Versi rilis: **v1.0.0-rc** · Basis kode: `main` · Tanggal: 14 November 2026
 | S4-03 | User Manual | [`03-manual/USER_MANUAL.md`](03-manual/USER_MANUAL.md) · [`USER_MANUAL.docx`](03-manual/USER_MANUAL.docx) · struktur: [`S4-03_struktur-user-manual.docx`](03-manual/S4-03_struktur-user-manual.docx) |
 | S4-03 | Technical Documentation | [`03-technical/TECHNICAL_DOCS.md`](03-technical/TECHNICAL_DOCS.md) |
 | S4-04 | README repositori | [`../README.md`](../README.md) |
-| S4-05 | API Documentation | [`04-api/openapi.json`](04-api/openapi.json), [`04-api/API_CONTRACT.md`](04-api/API_CONTRACT.md) |
+| S4-05 | API Documentation | [`04-api/tejas_coffee_api_collection.json`](04-api/tejas_coffee_api_collection.json) (Postman v2.1), [`04-api/openapi.json`](04-api/openapi.json), [`04-api/S4-05_spesifikasi-api.docx`](04-api/S4-05_spesifikasi-api.docx), [`04-api/API_CONTRACT.md`](04-api/API_CONTRACT.md) |
 | S4-06 | Slide presentasi | [`05-presentation/pitch-deck.html`](05-presentation/pitch-deck.html) |
 | S4-07 | Demo rehearsal | [`06-demo/DEMO_SCRIPT.md`](06-demo/DEMO_SCRIPT.md), [`06-demo/BERITA_ACARA_REHEARSAL.md`](06-demo/BERITA_ACARA_REHEARSAL.md) |
 | S4-08 | Pertanggungjawaban individu | [`07-defense/BANK_SOAL_DEFENSE.md`](07-defense/BANK_SOAL_DEFENSE.md) |

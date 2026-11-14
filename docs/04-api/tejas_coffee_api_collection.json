@@ -1,0 +1,249 @@
+{
+  "info": {
+    "name": "Tejas Coffee POS API",
+    "description": "Koleksi endpoint Tejas Coffee POS (v1.0.0-rc). Autentikasi memakai sesi login (cookie), bukan Bearer token. Jalankan POST /api/orders setelah login untuk mendapatkan sesi.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Katalog (Publik)",
+      "item": [
+        {
+          "name": "Daftar kategori",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/categories",
+            "description": ""
+          }
+        },
+        {
+          "name": "Daftar menu + filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/products?kategori=Espresso%20Based&search=capp",
+            "description": ""
+          }
+        },
+        {
+          "name": "Detail menu",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/products/ESP-CAP-01",
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Pesanan",
+      "item": [
+        {
+          "name": "Buat pesanan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/orders",
+            "description": "Harga & stok dihitung ulang di server; stok dipotong atomik.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipe_pesanan\": \"dine-in\",\n  \"id_meja\": 4,\n  \"id_promo\": 1,\n  \"tukar_poin\": true,\n  \"catatan\": \"Tanpa sedotan\",\n  \"items\": [\n    {\n      \"id_produk\": 3,\n      \"jumlah\": 2,\n      \"harga_satuan\": 32000,\n      \"catatan_item\": \"Less sugar\"\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Daftar pesanan (kasir/barista)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/orders?status=baru",
+            "description": ""
+          }
+        },
+        {
+          "name": "Detail pesanan",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/orders/PSN-20261114-A1B2C3",
+            "description": ""
+          }
+        },
+        {
+          "name": "Ubah status pesanan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/orders/101/status",
+            "description": "Transisi sah: baru -> diproses -> selesai. Selesai mensyaratkan lunas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_pesanan\": \"diproses\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Batalkan pesanan",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/orders/101/cancel",
+            "description": "Stok & poin dikembalikan. Ditolak bila sudah lunas/selesai."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Pembayaran",
+      "item": [
+        {
+          "name": "Webhook Midtrans",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/midtrans/callback",
+            "description": "Signature diverifikasi SHA-512; bebas CSRF.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"PSN-20261114-A1B2C3-1763000000\",\n  \"status_code\": \"200\",\n  \"gross_amount\": \"71800.00\",\n  \"signature_key\": \"<sha512(order_id+status_code+gross_amount+server_key)>\",\n  \"transaction_status\": \"settlement\",\n  \"payment_type\": \"qris\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Ops Agent",
+      "item": [
+        {
+          "name": "Financial summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/ops/financial-summary",
+            "description": ""
+          }
+        },
+        {
+          "name": "Traffic telemetry",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/ops/traffic-telemetry",
+            "description": ""
+          }
+        },
+        {
+          "name": "Inventory alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/inventory/alerts",
+            "description": ""
+          }
+        },
+        {
+          "name": "Reorder ke roastery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/v1/inventory/reorder",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destination\": \"Roastery Dispatch #01\",\n  \"item\": \"Arabika Gayo\",\n  \"order_quantity_kg\": 20\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
