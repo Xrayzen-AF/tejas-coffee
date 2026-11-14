@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pitch Deck — Tejas Coffee POS v1.0.0-rc</title>
+<title>Pitch Deck 10 Slide — Tejas Coffee POS v1.0.0-rc</title>
 <style>
   :root{
     --ink:#12100E; --ink-soft:#4A443E; --cream:#FBF7F0; --paper:#FFFFFF;
@@ -11,67 +11,94 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;}
-  body{
-    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
-    background:#1B1512; color:var(--ink); overflow:hidden;
-  }
-  .deck{position:relative;height:100vh;display:flex;align-items:center;justify-content:center;}
-  .slide{
-    display:none; width:min(96vw,1180px); aspect-ratio:16/9; max-height:94vh;
-    background:var(--cream); border-radius:10px; padding:3.4% 4.2%;
-    box-shadow:0 30px 70px rgba(0,0,0,.45); overflow:hidden; position:relative;
-    flex-direction:column;
-  }
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:#1B1512;color:var(--ink);overflow:hidden;}
+  .bar{position:fixed;top:0;left:0;right:0;height:44px;display:flex;align-items:center;
+    gap:.5rem;padding:0 14px;background:#140F0C;color:#C8B7A4;z-index:20;font:600 12px/1 ui-monospace,monospace;letter-spacing:.08em;}
+  .bar button{background:#241A14;color:#E9DCCB;border:1px solid #3A2A20;border-radius:6px;
+    padding:6px 10px;font:600 11px/1 "Segoe UI",sans-serif;cursor:pointer;letter-spacing:.06em;}
+  .bar button:hover{background:#31221A;}
+  .clock{min-width:64px;color:#F0DCC0;letter-spacing:.16em;}
+  .clock.low{color:#F87171;}
+  .sep{flex:1;}
+  .deck{position:relative;height:100vh;padding-top:44px;display:flex;align-items:center;justify-content:center;}
+  .slide{display:none;width:min(96vw,1180px);aspect-ratio:16/9;max-height:calc(94vh - 44px);
+    background:var(--cream);border-radius:10px;padding:3.2% 4%;box-shadow:0 30px 70px rgba(0,0,0,.45);
+    overflow:hidden;position:relative;flex-direction:column;}
   .slide.active{display:flex;}
   .slide.cover{background:linear-gradient(150deg,var(--espresso),#4A2F21 60%,#6B4429);color:var(--cream);justify-content:center;}
-  .kicker{font-size:.78rem;letter-spacing:.22em;text-transform:uppercase;color:var(--roast);font-weight:700;}
+  .kicker{font-size:.76rem;letter-spacing:.22em;text-transform:uppercase;color:var(--roast);font-weight:700;}
   .cover .kicker{color:var(--bean);}
-  h1{font-size:clamp(1.8rem,4.1vw,3.1rem);line-height:1.06;margin:.4rem 0 .6rem;letter-spacing:-.02em;}
-  h2{font-size:clamp(1.35rem,2.5vw,2rem);line-height:1.15;margin:.25rem 0 1rem;letter-spacing:-.01em;}
-  h2::after{content:"";display:block;width:64px;height:4px;background:var(--bean);border-radius:2px;margin-top:.6rem;}
-  p,li{font-size:clamp(.82rem,1.24vw,1.03rem);line-height:1.55;color:var(--ink-soft);}
-  .cover p{color:#E9DCCB;max-width:60ch;}
-  ul{margin:.2rem 0 0;padding-left:1.1rem;}
-  li{margin-bottom:.42rem;}
-  .grid{display:grid;gap:.85rem;margin-top:.4rem;}
+  h1{font-size:clamp(1.7rem,4vw,3rem);line-height:1.06;margin:.4rem 0 .6rem;letter-spacing:-.02em;}
+  h2{font-size:clamp(1.3rem,2.4vw,1.95rem);line-height:1.15;margin:.25rem 0 .9rem;letter-spacing:-.01em;}
+  h2::after{content:"";display:block;width:64px;height:4px;background:var(--bean);border-radius:2px;margin-top:.55rem;}
+  p,li{font-size:clamp(.8rem,1.2vw,1rem);line-height:1.5;color:var(--ink-soft);}
+  .cover p{color:#E9DCCB;max-width:62ch;}
+  ul{margin:.2rem 0 0;padding-left:1.1rem;} li{margin-bottom:.38rem;}
+  .grid{display:grid;gap:.8rem;margin-top:.3rem;}
   .g2{grid-template-columns:1fr 1fr;} .g3{grid-template-columns:repeat(3,1fr);}
-  .card{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:.85rem .95rem;}
-  .card strong{display:block;font-size:.95rem;margin-bottom:.2rem;color:var(--espresso);}
-  .card span{font-size:.8rem;color:var(--ink-soft);line-height:1.45;display:block;}
-  .stat{font-size:clamp(1.5rem,3vw,2.3rem);font-weight:800;color:var(--mint);letter-spacing:-.02em;line-height:1;}
-  .stat small{display:block;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-top:.35rem;}
-  table{width:100%;border-collapse:collapse;font-size:clamp(.72rem,1.1vw,.9rem);}
-  th,td{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--line);}
-  th{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--roast);}
-  .flow{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;font-size:.82rem;font-weight:600;color:var(--espresso);}
-  .flow i{font-style:normal;background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:.35rem .7rem;}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:.8rem .9rem;}
+  .card strong{display:block;font-size:.92rem;margin-bottom:.2rem;color:var(--espresso);}
+  .card span{font-size:.78rem;color:var(--ink-soft);line-height:1.42;display:block;}
+  .stat{font-size:clamp(1.4rem,2.9vw,2.2rem);font-weight:800;color:var(--mint);letter-spacing:-.02em;line-height:1;}
+  .stat small{display:block;font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-top:.3rem;}
+  table{width:100%;border-collapse:collapse;font-size:clamp(.7rem,1.05vw,.88rem);}
+  th,td{text-align:left;padding:.36rem .48rem;border-bottom:1px solid var(--line);}
+  th{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--roast);}
+  .flow{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;font-size:.8rem;font-weight:600;color:var(--espresso);}
+  .flow i{font-style:normal;background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:.32rem .66rem;}
   .flow b{color:var(--bean);}
-  .formula{background:var(--espresso);color:var(--cream);border-radius:9px;padding:.7rem .9rem;font-family:ui-monospace,Consolas,monospace;font-size:.82rem;margin-top:.6rem;}
-  .foot{position:absolute;left:4.2%;right:4.2%;bottom:2.2%;display:flex;justify-content:space-between;font-size:.7rem;color:#9C9188;letter-spacing:.06em;text-transform:uppercase;}
+  .formula{background:var(--espresso);color:var(--cream);border-radius:9px;padding:.65rem .85rem;
+    font-family:ui-monospace,Consolas,monospace;font-size:.8rem;margin-top:.55rem;line-height:1.5;}
+  .foot{position:absolute;left:4%;right:4%;bottom:2%;display:flex;justify-content:space-between;
+    font-size:.68rem;color:#9C9188;letter-spacing:.06em;text-transform:uppercase;}
   .cover .foot{color:#B9A48D;}
-  .badge{display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.28rem .6rem;border-radius:99px;background:rgba(200,150,90,.18);color:var(--roast);border:1px solid rgba(200,150,90,.4);}
-  .cover .badge{background:rgba(200,150,90,.22);color:#F0DCC0;border-color:rgba(200,150,90,.55);}
-  .hud{position:fixed;bottom:14px;right:18px;color:#8B7F76;font:600 12px/1 ui-monospace,monospace;letter-spacing:.1em;}
-  .hint{position:fixed;bottom:14px;left:18px;color:#6E645C;font:500 11px/1 "Segoe UI",sans-serif;}
+  /* Grafik alokasi scope */
+  .scope{margin-top:.7rem;}
+  .scope-labels{display:flex;justify-content:space-between;font-size:.72rem;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.3rem;}
+  .track{height:26px;border-radius:6px;overflow:hidden;display:flex;border:1px solid var(--line);}
+  .track .in{background:var(--mint);color:#fff;display:flex;align-items:center;justify-content:center;
+    font:700 .72rem/1 "Segoe UI",sans-serif;letter-spacing:.08em;width:72%;}
+  .track .out{background:#E8DCC9;color:#6B5A4A;display:flex;align-items:center;justify-content:center;
+    font:700 .72rem/1 "Segoe UI",sans-serif;letter-spacing:.08em;width:28%;}
+  .legend{display:flex;gap:1.2rem;font-size:.72rem;color:var(--ink-soft);margin-top:.35rem;}
+  .legend b{color:var(--espresso);}
+  /* Teleprompter */
+  .notes{display:none;position:absolute;left:0;right:0;bottom:0;background:rgba(18,16,14,.96);
+    color:#F3E5D2;padding:.85rem 1.1rem 1rem;font-size:.82rem;line-height:1.55;border-top:3px solid var(--bean);}
+  .notes b{color:var(--bean);letter-spacing:.08em;font-size:.68rem;text-transform:uppercase;display:block;margin-bottom:.25rem;}
+  body.show-notes .notes{display:block;}
+  .hint{position:fixed;bottom:10px;left:14px;color:#6E645C;font:500 10.5px/1 "Segoe UI",sans-serif;z-index:20;}
   @media print{
     @page{size:A4 landscape;margin:0;}
     body{background:#fff;overflow:visible;}
-    .deck{display:block;height:auto;}
+    .bar,.hint,.notes{display:none!important;}
+    .deck{display:block;height:auto;padding:0;}
     .slide{display:flex!important;width:100%;height:100vh;aspect-ratio:auto;max-height:none;
       border-radius:0;box-shadow:none;page-break-after:always;break-after:page;}
     .slide:last-child{page-break-after:auto;break-after:auto;}
-    .hud,.hint{display:none;}
   }
 </style>
 </head>
 <body>
+
+<div class="bar">
+  <span id="counter">01 / 10</span>
+  <span class="sep"></span>
+  <span class="clock" id="clock">10:00</span>
+  <button id="btnTimer" type="button">▶ MULAI</button>
+  <button id="btnNotes" type="button">NASKAH (N)</button>
+  <button id="btnPdf" type="button">PDF</button>
+</div>
+
 <div class="deck" id="deck">
 
+  <!-- 1 -->
   <section class="slide cover active">
     <span class="kicker">UKK Rekayasa Perangkat Lunak · 2026/2027</span>
     <h1>Tejas Coffee POS</h1>
-    <p>Sistem pemesanan coffee shop: pelanggan memesan sendiri lewat QR meja, kasir menagih dalam satu layar, barista melihat antrean secara real-time, dan pemilik toko membaca angka penjualan tanpa membuka Excel.</p>
-    <div class="grid g3" style="margin-top:1.6rem">
+    <p>Sistem pemesanan coffee shop: pelanggan memesan sendiri lewat QR meja, kasir menagih dalam satu layar, barista melihat antrean real-time, dan pemilik membaca angka penjualan tanpa Excel.</p>
+    <div class="grid g3" style="margin-top:1.4rem">
       <div class="card" style="background:rgba(251,247,240,.08);border-color:rgba(200,150,90,.35)">
         <strong style="color:#F3E5D2">Laravel 12 · MySQL</strong>
         <span style="color:#CDBBA6">Blade + Tailwind 4, Midtrans Core API</span>
@@ -85,108 +112,107 @@
         <span style="color:#CDBBA6">Admin · Kasir · Barista · Pelanggan</span>
       </div>
     </div>
-    <div class="foot"><span>Kelompok 04 — Karsa Digital Dev</span><span>Slide 1 / 12</span></div>
+    <div class="foot"><span>Kelompok 04 — Karsa Digital Dev</span><span>Slide 1 / 10</span></div>
+    <aside class="notes"><b>Naskah (±30 detik)</b>Selamat pagi, kami Kelompok 04 dengan aplikasi Tejas Coffee POS — sistem pemesanan coffee shop. Versi yang kami presentasikan adalah rilis kandidat 1.0.0 dengan 138 tes otomatis yang lulus. Kami akan mulai dari masalah nyata di lapangan.</aside>
   </section>
 
+  <!-- 2 -->
   <section class="slide">
     <span class="kicker">Masalah lapangan</span>
     <h2>Satu cafe, empat sumber kebocoran</h2>
     <div class="grid g2">
-      <div class="card"><strong>Antrean di kasir</strong><span>Pesanan ditulis di kertas, lalu diketik ulang ke mesin kasir. Rata-rata 4–6 menit per pesanan pada jam sibuk.</span></div>
-      <div class="card"><strong>Stok tidak sinkron</strong><span>Menu tetap dijual walau bahan habis; barista harus menolak pesanan yang sudah dibayar.</span></div>
+      <div class="card"><strong>Antrean di kasir</strong><span>Pesanan ditulis di kertas lalu diketik ulang ke mesin kasir. Rata-rata 4–6 menit per pesanan pada jam sibuk.</span></div>
+      <div class="card"><strong>Stok tidak sinkron</strong><span>Menu tetap dijual walau bahan habis; barista harus menolak pesanan yang sudah terlanjur dibayar.</span></div>
       <div class="card"><strong>Laporan manual</strong><span>Rekap harian disalin dari struk ke Excel; rawan salah jumlah dan butuh 1–2 jam tiap tutup toko.</span></div>
       <div class="card"><strong>Meja tidak terpantau</strong><span>Tidak ada catatan meja mana yang sedang dipakai, sehingga tamu saling menempati meja yang sama.</span></div>
     </div>
-    <p style="margin-top:.9rem"><strong>Kerugian terukur:</strong> potensi kehilangan omzet jam sibuk, plus waktu staf yang habis untuk pekerjaan administratif yang berulang.</p>
-    <div class="foot"><span>As-Is</span><span>Slide 2 / 12</span></div>
+    <p style="margin-top:.8rem"><strong>Kerugian terukur:</strong> omzet jam sibuk hilang karena antrean, plus waktu staf habis untuk pekerjaan administratif berulang.</p>
+    <div class="foot"><span>As-Is</span><span>Slide 2 / 10</span></div>
+    <aside class="notes"><b>Naskah (±45 detik)</b>Empat masalah ini saling menguatkan: antrean membuat tamu kabur, stok yang tidak sinkron membuat pesanan dibatalkan setelah dibayar, rekap manual memakan 1–2 jam tiap malam, dan status meja tidak pernah tercatat. Semuanya berakar pada satu hal: data tidak tinggal di satu tempat.</aside>
   </section>
 
+  <!-- 3 -->
   <section class="slide">
     <span class="kicker">Persona</span>
     <h2>Dua orang yang harus dimenangkan</h2>
     <div class="grid g2">
-      <div class="card">
-        <strong>Rani — pelanggan</strong>
-        <span>Datang saat jam makan siang, ingin duduk cepat. Tidak ingin mengantre hanya untuk memesan. Memakai HP untuk semuanya, dan mengharapkan status pesanan yang jelas.</span>
-      </div>
-      <div class="card">
-        <strong>Pak Bagas — pemilik &amp; kasir</strong>
-        <span>Merangkap kasir dan supervisor. Butuh angka penjualan yang bisa dicetak untuk setoran harian, dan butuh tahu stok biji mana yang harus segera dipesan ulang.</span>
-      </div>
+      <div class="card"><strong>Rani — pelanggan</strong><span>Datang saat jam makan siang dan ingin duduk cepat. Tidak ingin mengantre hanya untuk memesan. Memakai HP untuk semuanya dan mengharapkan status pesanan yang jelas.</span></div>
+      <div class="card"><strong>Pak Bagas — pemilik &amp; kasir</strong><span>Merangkap kasir dan supervisor. Butuh angka penjualan yang bisa dicetak untuk setoran harian, dan butuh tahu stok biji mana yang harus segera dipesan ulang.</span></div>
     </div>
-    <p style="margin-top:.9rem"><strong>Kebutuhan bersama:</strong> satu sumber kebenaran data — supaya angka di meja, di kasir, dan di laporan pemilik selalu sama.</p>
-    <div class="foot"><span>Target pengguna</span><span>Slide 3 / 12</span></div>
+    <p style="margin-top:.8rem"><strong>Kebutuhan bersama:</strong> satu sumber kebenaran data — supaya angka di meja, di kasir, dan di laporan pemilik selalu sama.</p>
+    <div class="foot"><span>Target pengguna</span><span>Slide 3 / 10</span></div>
+    <aside class="notes"><b>Naskah (±45 detik)</b>Rani mewakili pelanggan yang menilai cafe dari kecepatan. Pak Bagas mewakili pemilik yang merangkap kasir: dia butuh angka yang bisa langsung disetorkan dan peringatan stok. Keduanya bisa dipuaskan dengan satu sumber data yang sama.</aside>
   </section>
 
+  <!-- 4 -->
   <section class="slide">
     <span class="kicker">Solusi</span>
     <h2>Apa yang dibangun</h2>
     <div class="grid g3">
-      <div class="card"><strong>Pesan dari meja</strong><span>QR tiap meja membuka menu. Pelanggan memesan sendiri, meja otomatis tercatat terisi 90 menit.</span></div>
+      <div class="card"><strong>Pesan dari meja</strong><span>QR tiap meja membuka menu. Pelanggan memesan sendiri, meja tercatat terisi 90 menit.</span></div>
       <div class="card"><strong>POS satu layar</strong><span>Kasir menambah item ke draf tiket, lalu menagih tunai, QRIS, atau virtual account.</span></div>
       <div class="card"><strong>KDS barista</strong><span>Antrean pesanan real-time, bisa disematkan (bump) atau disembunyikan (dismiss).</span></div>
       <div class="card"><strong>Laporan siap cetak</strong><span>Laporan A4 berfilter periode, plus ekspor CSV untuk Excel.</span></div>
       <div class="card"><strong>Loyalitas</strong><span>Poin otomatis 1 per Rp 10.000, bisa ditukar saat checkout.</span></div>
       <div class="card"><strong>Inventori biji</strong><span>Ambang kritis dan reorder otomatis ke roastery lewat webhook.</span></div>
     </div>
-    <div class="foot"><span>Solusi</span><span>Slide 4 / 12</span></div>
+    <div class="foot"><span>Solusi</span><span>Slide 4 / 10</span></div>
+    <aside class="notes"><b>Naskah (±45 detik)</b>Enam kemampuan ini menutup empat masalah tadi: pesanan tidak lagi ditulis di kertas, stok dipotong di server, meja punya status, dan laporan langsung tercetak. Semuanya berjalan di satu aplikasi web yang sama.</aside>
   </section>
 
+  <!-- 5 -->
   <section class="slide">
     <span class="kicker">Batas lingkup</span>
     <h2>Yang sengaja tidak dikerjakan</h2>
     <table>
       <tr><th>Di dalam lingkup</th><th>Di luar lingkup</th><th>Alasan</th></tr>
-      <tr><td>Upload bukti bayar / QRIS dinamis</td><td>Payment gateway custom &amp; settlement otomatis</td><td>Midtrans sudah menangani; membangun sendiri tidak sepadan</td></tr>
+      <tr><td>QRIS dinamis + virtual account</td><td>Payment gateway buatan sendiri &amp; settlement otomatis</td><td>Midtrans sudah menangani; membangun sendiri tidak sepadan</td></tr>
       <tr><td>Geofence radius cafe</td><td>Aplikasi mobile native</td><td>Web responsif cukup; hemat waktu pengembangan</td></tr>
       <tr><td>Notifikasi status di aplikasi</td><td>Notifikasi WhatsApp / SMS</td><td>Butuh biaya pihak ketiga dan verifikasi bisnis</td></tr>
-      <tr><td>Laporan cetak A4 + CSV</td><td>Akuntansi lengkap (jurnal, neraca)</td><td>Bukan kompetensi inti; laporan operasional sudah memadai</td></tr>
+      <tr><td>Laporan cetak A4 + CSV</td><td>Akuntansi lengkap (jurnal, neraca)</td><td>Bukan kompetensi inti; laporan operasional memadai</td></tr>
     </table>
-    <p style="margin-top:.8rem">Menjaga lingkup adalah bagian dari rekayasa: setiap fitur yang tidak dikerjakan adalah fitur yang tidak bisa merusak demo.</p>
-    <div class="foot"><span>In scope vs out of scope</span><span>Slide 5 / 12</span></div>
+    <div class="scope">
+      <div class="scope-labels"><span>Alokasi usaha pengembangan</span><span>1 rilis kandidat</span></div>
+      <div class="track"><div class="in">IN SCOPE 72%</div><div class="out">OUT 28%</div></div>
+      <div class="legend"><span><b>In scope:</b> pesanan, pembayaran, dapur, laporan</span><span><b>Out:</b> native app, WhatsApp, akuntansi</span></div>
+    </div>
+    <div class="foot"><span>In scope vs out of scope</span><span>Slide 5 / 10</span></div>
+    <aside class="notes"><b>Naskah (±30 detik)</b>Kami sengaja membatasi lingkup. Membangun payment gateway sendiri butuh sertifikasi dan waktu berbulan-bulan, sedangkan Midtrans sudah menyediakan QRIS dan virtual account. Menjaga lingkup adalah bagian dari rekayasa: fitur yang tidak dikerjakan tidak bisa merusak demo.</aside>
   </section>
 
+  <!-- 6 -->
   <section class="slide">
     <span class="kicker">Arsitektur</span>
     <h2>MVC berlapis dengan service terpisah</h2>
     <div class="flow">
       <i>Blade + Tailwind</i><b>→</b><i>routes/web.php</i><b>→</b><i>Middleware role &amp; geofence</i><b>→</b><i>Controller</i><b>→</b><i>Service / Model</i><b>→</b><i>MySQL</i>
     </div>
-    <div class="grid g3" style="margin-top:1rem">
+    <div class="grid g3" style="margin-top:.9rem">
       <div class="card"><strong>14 tabel</strong><span>Seluruhnya 3NF, foreign key aktif, harga transaksi disimpan sebagai snapshot.</span></div>
-      <div class="card"><strong>14 tes file</strong><span>138 kasus uji: RBAC, alur pesanan, QR meja, Midtrans, laporan, inventori.</span></div>
-      <div class="card"><strong>2 jalur API</strong><span>API transaksi (session) dan Ops Agent API untuk ringkasan keuangan &amp; inventori.</span></div>
+      <div class="card"><strong>138 tes</strong><span>14 berkas uji: RBAC, alur pesanan, QR meja, Midtrans, laporan, inventori.</span></div>
+      <div class="card"><strong>2 jalur API</strong><span>API transaksi (sesi) dan Ops Agent API untuk keuangan &amp; inventori.</span></div>
     </div>
     <div class="formula">Pesanan: baru → diproses → selesai · dibatalkan (stok &amp; poin dikembalikan)</div>
-    <div class="foot"><span>Teknis</span><span>Slide 6 / 12</span></div>
+    <div class="foot"><span>Teknis</span><span>Slide 6 / 10</span></div>
+    <aside class="notes"><b>Naskah (±45 detik)</b>Arsitekturnya MVC berlapis: Blade di depan, middleware peran dan geofence menjaga rute, controller memanggil service, dan Eloquent menjaga relasi 14 tabel yang seluruhnya 3NF. Status pesanan dijaga state machine, sehingga tidak ada transisi mundur yang tidak sah.</aside>
   </section>
 
+  <!-- 7 -->
   <section class="slide">
-    <span class="kicker">Fitur andalan #1</span>
+    <span class="kicker">Fitur andalan</span>
     <h2>Anti-oversell: stok tidak bisa minus</h2>
     <p>Dua kasir bisa menjual croissant terakhir pada detik yang sama. Solusinya bukan validasi di form, melainkan penguncian baris di dalam transaksi basis data.</p>
     <div class="formula">DB::transaction → SELECT ... FOR UPDATE → cek stok → potong stok → commit</div>
-    <ul style="margin-top:.9rem">
+    <ul style="margin-top:.8rem">
       <li>Stok gabungan dihitung lintas varian sebelum item masuk keranjang.</li>
       <li>Harga kiriman client tidak boleh di bawah harga dasar produk (anti order Rp 1).</li>
-      <li>Pesanan batal mengembalikan stok dan poin secara otomatis, idempoten.</li>
+      <li>Pesanan batal mengembalikan stok dan poin otomatis, idempoten.</li>
     </ul>
-    <div class="foot"><span>Integritas data</span><span>Slide 7 / 12</span></div>
+    <div class="foot"><span>Integritas data</span><span>Slide 7 / 10</span></div>
+    <aside class="notes"><b>Naskah (±60 detik)</b>Ini fitur yang paling sering diuji penguji. Dua kasir bisa menekan tombol pada detik yang sama untuk croissant terakhir. Kami tidak mengandalkan validasi JavaScript, tapi mengunci baris produk memakai SELECT FOR UPDATE di dalam transaksi. Kasir kedua menunggu, membaca stok terbaru, lalu ditolak dengan pesan stok tidak mencukupi. Perhitungan uang memakai bcmath agar tidak ada selisih pembulatan.</aside>
   </section>
 
-  <section class="slide">
-    <span class="kicker">Fitur andalan #2</span>
-    <h2>Laporan penjualan yang bisa dipertanggungjawabkan</h2>
-    <div class="grid g3">
-      <div class="card"><div class="stat">A4<small>Format cetak</small></div><span>Kop toko, periode, waktu cetak, admin pencetak, nomor halaman.</span></div>
-      <div class="card"><div class="stat">4<small>Rekap</small></div><span>Harian, per produk, per metode bayar, dan rincian transaksi.</span></div>
-      <div class="card"><div class="stat">CSV<small>Ekspor</small></div><span>BOM UTF-8 + pemisah titik-koma, langsung rapi di Excel Indonesia.</span></div>
-    </div>
-    <div class="formula">Omzet = SUM(transaksi.subtotal) — bukan total_bayar, agar kembalian tunai tidak dihitung pendapatan</div>
-    <p style="margin-top:.8rem">Angka laporan memakai query yang sama dengan dashboard, sehingga tidak mungkin berbeda antara layar dan kertas.</p>
-    <div class="foot"><span>Pelaporan</span><span>Slide 8 / 12</span></div>
-  </section>
-
+  <!-- 8 -->
   <section class="slide">
     <span class="kicker">Keamanan &amp; kualitas</span>
     <h2>Yang sudah diuji, bukan diasumsikan</h2>
@@ -198,9 +224,11 @@
       <div class="card"><strong>Upload aman</strong><span>Whitelist tipe gambar, batas ukuran, nama berkas dibuat ulang.</span></div>
       <div class="card"><strong>Geofence di server</strong><span>Koordinat diverifikasi ulang di backend, bukan hanya di JavaScript.</span></div>
     </div>
-    <div class="foot"><span>QA &amp; security</span><span>Slide 9 / 12</span></div>
+    <div class="foot"><span>QA &amp; security</span><span>Slide 8 / 10</span></div>
+    <aside class="notes"><b>Naskah (±45 detik)</b>Semua klaim di slide ini punya bukti tes. 138 kasus uji lulus dengan 669 assertion. Struk dilindungi policy, webhook memverifikasi signature, order pelanggan tidak bisa memakai identitas orang lain, dan geofence divalidasi di server sehingga tidak bisa dilewati dari browser.</aside>
   </section>
 
+  <!-- 9 -->
   <section class="slide">
     <span class="kicker">Dampak</span>
     <h2>Nilai bagi cafe dan stafnya</h2>
@@ -209,33 +237,21 @@
       <div class="card"><div class="stat">1<small>Sumber data</small></div><span>Meja, kasir, barista, dan laporan membaca data yang sama.</span></div>
       <div class="card"><div class="stat">24/7<small>Antrean terpantau</small></div><span>Pesanan tidak lagi hilang di kertas.</span></div>
     </div>
-    <ul style="margin-top:.9rem">
+    <ul style="margin-top:.8rem">
       <li>Pelanggan tidak perlu mengantre hanya untuk memesan.</li>
       <li>Barista menerima pesanan yang stoknya sudah pasti tersedia.</li>
       <li>Pemilik mendapat angka yang bisa langsung disetorkan dan diarsipkan.</li>
     </ul>
-    <div class="foot"><span>Dampak</span><span>Slide 10 / 12</span></div>
+    <div class="foot"><span>Dampak</span><span>Slide 9 / 10</span></div>
+    <aside class="notes"><b>Naskah (±30 detik)</b>Dampaknya sederhana tapi terasa setiap hari: tidak ada lagi rekap manual, semua peran membaca angka yang sama, dan antrean terpantau. Bagi UMKM kopi, waktu staf yang kembali satu sampai dua jam per hari itu nyata.</aside>
   </section>
 
-  <section class="slide">
-    <span class="kicker">Keberlanjutan</span>
-    <h2>Rencana setelah rilis kandidat</h2>
-    <table>
-      <tr><th>Tahap</th><th>Kegiatan</th><th>Penanggung jawab</th></tr>
-      <tr><td>Rilis</td><td>Deployment staging + fallback server lokal LAN</td><td>Backend</td></tr>
-      <tr><td>Dokumentasi</td><td>User manual, dokumentasi teknis, spesifikasi API</td><td>Frontend</td></tr>
-      <tr><td>Operasional</td><td>Pelatihan singkat kasir &amp; barista, buku panduan tercetak</td><td>Bersama</td></tr>
-      <tr><td>Pengembangan lanjutan</td><td>Notifikasi WhatsApp, aplikasi kasir offline (PWA)</td><td>Bersama</td></tr>
-    </table>
-    <p style="margin-top:.8rem">Semua kode, dokumen, dan riwayat perubahan tersimpan di repositori Git dengan tag rilis, sehingga pengembangan berikutnya bisa dimulai dari titik yang jelas.</p>
-    <div class="foot"><span>Roadmap</span><span>Slide 11 / 12</span></div>
-  </section>
-
+  <!-- 10 -->
   <section class="slide cover">
     <span class="kicker">Penutup</span>
-    <h1 style="font-size:clamp(1.7rem,3.6vw,2.7rem)">Silakan uji sendiri</h1>
+    <h1 style="font-size:clamp(1.6rem,3.5vw,2.6rem)">Silakan uji sendiri</h1>
     <p>Kami mengundang penguji mencoba alur lengkap: pindai QR meja, pesan dari HP, bayar, lihat pesanan masuk di layar barista, lalu cetak laporan penjualan hari ini.</p>
-    <div class="grid g2" style="margin-top:1.4rem">
+    <div class="grid g2" style="margin-top:1.2rem">
       <div class="card" style="background:rgba(251,247,240,.08);border-color:rgba(200,150,90,.35)">
         <strong style="color:#F3E5D2">Akun demo</strong>
         <span style="color:#CDBBA6">admin@kopi.dev · kasir@kopi.dev · barista@kopi.dev — password: password</span>
@@ -245,29 +261,71 @@
         <span style="color:#CDBBA6">Bila internet putus, demo dialihkan ke server lokal LAN tanpa kehilangan fitur.</span>
       </div>
     </div>
-    <p style="margin-top:1.4rem;font-size:1.05rem;color:#F0DCC0"><strong>Terima kasih.</strong> Pertanyaan teknis kami jawab langsung di depan kode.</p>
-    <div class="foot"><span>Kelompok 04 — Karsa Digital Dev</span><span>Slide 12 / 12</span></div>
+    <p style="margin-top:1.2rem;font-size:1rem;color:#F0DCC0"><strong>Terima kasih.</strong> Pertanyaan teknis kami jawab langsung di depan kode.</p>
+    <div class="foot"><span>Kelompok 04 — Karsa Digital Dev</span><span>Slide 10 / 10</span></div>
+    <aside class="notes"><b>Naskah (±15 detik)</b>Terima kasih. Kami siap mendemonstrasikan transaksi penuh dari meja sampai laporan, dan menjawab pertanyaan teknis langsung di depan kode.</aside>
   </section>
 
 </div>
-<div class="hint">← → pindah slide · Ctrl+P untuk ekspor PDF (A4 landscape)</div>
-<div class="hud" id="hud">01 / 12</div>
+
+<div class="hint">← → pindah slide · T mulai/jeda timer 10 menit · N tampilkan naskah · Ctrl+P ekspor PDF (A4 landscape)</div>
+
 <script>
   const slides = [...document.querySelectorAll('.slide')];
-  const hud = document.getElementById('hud');
+  const counter = document.getElementById('counter');
+  const clock = document.getElementById('clock');
+  const btnTimer = document.getElementById('btnTimer');
+  const btnNotes = document.getElementById('btnNotes');
+  const btnPdf = document.getElementById('btnPdf');
+
   let i = 0;
   const paint = () => {
     slides.forEach((s, n) => s.classList.toggle('active', n === i));
-    hud.textContent = String(i + 1).padStart(2, '0') + ' / ' + slides.length;
+    counter.textContent = String(i + 1).padStart(2, '0') + ' / ' + slides.length;
   };
   const go = (n) => { i = Math.max(0, Math.min(slides.length - 1, n)); paint(); };
+
+  // Timer 10 menit
+  const TOTAL = 10 * 60;
+  let left = TOTAL, tick = null;
+  const render = () => {
+    const m = String(Math.floor(left / 60)).padStart(2, '0');
+    const s = String(left % 60).padStart(2, '0');
+    clock.textContent = m + ':' + s;
+    clock.classList.toggle('low', left <= 120);
+  };
+  const startTimer = () => {
+    if (tick) return;
+    btnTimer.textContent = '⏸ JEDA';
+    tick = setInterval(() => {
+      left = Math.max(0, left - 1);
+      render();
+      if (left === 0) { clearInterval(tick); tick = null; btnTimer.textContent = '▶ MULAI'; }
+    }, 1000);
+  };
+  const pauseTimer = () => {
+    clearInterval(tick); tick = null; btnTimer.textContent = '▶ LANJUT';
+  };
+  btnTimer.addEventListener('click', () => (tick ? pauseTimer() : startTimer()));
+  btnNotes.addEventListener('click', () => document.body.classList.toggle('show-notes'));
+  btnPdf.addEventListener('click', () => window.print());
+
   document.addEventListener('keydown', (e) => {
-    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(i + 1); }
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (['ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); go(i + 1); }
     if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(i - 1); }
+    if (e.key === ' ') { e.preventDefault(); go(i + 1); }
     if (e.key === 'Home') go(0);
     if (e.key === 'End') go(slides.length - 1);
+    if (e.key.toLowerCase() === 't') { tick ? pauseTimer() : startTimer(); }
+    if (e.key.toLowerCase() === 'n') document.body.classList.toggle('show-notes');
   });
-  document.addEventListener('click', (e) => { if (e.target.closest('.slide')) go(i + 1); });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.bar') || e.target.closest('.notes')) return;
+    if (e.target.closest('.slide')) go(i + 1);
+  });
+
+  render();
   paint();
 </script>
 </body>

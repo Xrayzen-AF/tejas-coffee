@@ -1,6 +1,6 @@
 # Naskah Gladi Bersih & Live Demo
 
-Total 30 menit: **7 menit pitching**, **8 menit demo aplikasi**, **15 menit tanya-jawab**.
+Total +/-33 menit: **10 menit pitching (10 slide)**, **8 menit demo aplikasi**, **15 menit tanya-jawab**.
 Semua langkah di bawah sudah diuji; jangan menambah langkah baru saat hari-H.
 
 ## Persiapan 10 Menit Sebelum Masuk
