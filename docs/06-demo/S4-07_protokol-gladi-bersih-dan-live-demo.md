@@ -11,9 +11,9 @@ sequenceDiagram
     participant App as 💻 Sistem Tejas Coffee POS
 
     Note over Siswa1,Siswa2: Skenario 1: Alur Pesan Mandiri dari Meja (Happy Path)
-    Siswa1->>App: Pindai QR Meja 01 & Buka Menu Publik
-    Siswa1->>App: Check-in Meja 01 (berlaku 90 menit)
-    Siswa1->>App: Pilih Mont Blanc ukuran Large, catatan "less sugar" & Tambah ke Keranjang
+    Siswa1->>App: Pindai QR Meja M01 & Buka Menu Publik
+    Siswa1->>App: Check-in Meja M01 (berlaku 90 menit)
+    Siswa1->>App: Pilih Mont Blanc (Rp 25.000) - opsi Large 500 ml & Oat Milk, catatan "less sugar", Tambah ke Keranjang
     App-->>Penguji: Total dihitung ulang di server, keranjang tersimpan
     Siswa1->>App: Terapkan Voucher WELCOME10 & Tukar Bean Points
     Siswa1->>App: Checkout Dine-in & Buat Pesanan
@@ -25,7 +25,7 @@ sequenceDiagram
     Note over App: Dua pesanan bersamaan dikunci SELECT ... FOR UPDATE dalam satu transaksi
 
     Note over Siswa1,Siswa2: Skenario 3: Verifikasi di Sisi Kasir (Pak Bagas)
-    Siswa2->>App: Login kasir@kopi.dev & Tampilkan Papan Meja (Meja 01 Terisi)
+    Siswa2->>App: Login kasir@kopi.dev & Tampilkan Papan Meja (Meja M01 Terisi)
     Siswa2->>App: Buka Panel Pembayaran Pesanan PSN-xxxxx & Klik QRIS
     App-->>Penguji: QR QRIS tampil (cadangan: Tunai + kalkulator kembalian)
     Siswa2->>App: Klik "Tandai Lunas" & Cetak Struk 80 mm

@@ -54,7 +54,7 @@ Demo akan kami mulai dari pelanggan yang memesan lewat QR meja."*
    *(Bila geofence dimatikan, langkah ini dilewati — sebutkan alasannya.)*
 3. Buka `/meja/{qr_token}` (atau **Menu → Pindai QR Meja**).
 4. Klik **Check-in Meja** → meja tercatat atas nama pelanggan, berlaku 90 menit.
-5. **Menu** → pilih *Cappuccino* → kustomisasi (ukuran Large, catatan *less sugar*) → **Tambah ke Keranjang**.
+5. **Menu** → pilih *Mont Blanc* → kustomisasi (opsi Large 500 ml + Oat Milk, catatan *less sugar*) → **Tambah ke Keranjang**.
 6. Tambah satu item lagi. Buka **Keranjang**:
    - masukkan voucher `WELCOME10` → tunjukkan diskon muncul;
    - centang **Tukar Bean Points**;
