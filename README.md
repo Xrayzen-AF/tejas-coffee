@@ -85,17 +85,19 @@ Akses aplikasi melalui browser Anda pada tautan: http://localhost:8000.
 
 Gunakan kredensial berikut untuk menguji hak akses multi-role. Semua akun memakai password `password` dan dapat login memakai email **atau** nomor HP.
 
-| **Role Pengguna** | **Alamat Email** | **Nomor HP** | **Password** | **Hak Akses Utama** |
-| --- | --- | --- | --- | --- |
-| **Admin** | admin@kopi.dev | 081100000001 | password | Sales & Revenue, Inventori, Staff, CRM, Master Data, Store Settings, cetak laporan |
-| **Kasir** | kasir@kopi.dev | 081200000001 | password | POS tiket, status meja, tunai/QRIS/VA, struk 80 mm, tandai lunas |
-| **Barista** | barista@kopi.dev | 081300000001 | password | KDS (bump/dismiss), ubah status meja |
-| **Pelanggan** | pelanggan@kopi.dev | 081234567890 | password | Pesan menu via QR meja, voucher, poin, checkout, riwayat & struk |
+| **Role Pengguna** | **Alamat Email** | **Password** | **Hak Akses Utama** |
+| --- | --- | --- | --- |
+| **Admin** | admin@kopi.dev | password | Sales & Revenue, Inventori, Staff, CRM, Master Data, Store Settings, cetak laporan |
+| **Kasir** | kasir@kopi.dev | password | POS tiket, status meja, tunai/QRIS/VA, struk 80 mm, tandai lunas |
+| **Barista** | barista@kopi.dev | password | KDS (bump/dismiss), ubah status meja |
+| **Pelanggan** | pelanggan@kopi.dev | password | Pesan menu via QR meja, voucher, poin, checkout, riwayat & struk |
+
+> Nomor HP akun demo: 081100000001 (admin), 081200000001 (kasir), 081300000001 (barista), 081234567890 (pelanggan).
 
 ## 👥 5. Anggota Tim Pengembang (Kelompok 04)
 
-* **Siswa 1 — Frontend Specialist & UI/UX Designer** • _NISN: (sesuaikan)_
-* **Siswa 2 — Backend Architect & Database Administrator** • _NISN: (sesuaikan)_
+* **Siswa 1 (nama lengkap):** Frontend Specialist & UI/UX Designer • _NISN: (sesuaikan)_
+* **Siswa 2 (nama lengkap):** Backend Architect & Database Administrator • _NISN: (sesuaikan)_
 
 _Pembimbing UKK:_ **(sesuaikan nama pembimbing, S.Kom.)**
 **(sesuaikan nama sekolah) — 2026**
@@ -225,9 +227,9 @@ screenshots/                    Tangkapan layar dokumentasi UI
 | User Manual (S4-03) | [`docs/03-manual/USER_MANUAL.docx`](docs/03-manual/USER_MANUAL.docx) |
 | Dokumentasi teknis (S4-03) | [`docs/03-technical/TECHNICAL_DOCS.md`](docs/03-technical/TECHNICAL_DOCS.md) |
 | Spesifikasi API (S4-05) | [`docs/04-api/openapi.json`](docs/04-api/openapi.json) |
-| Slide presentasi (S4-06) | [`docs/05-presentation/pitch-deck.html`](docs/05-presentation/pitch-deck.html) |
-| Naskah demo & berita acara (S4-07) | [`docs/06-demo/`](docs/06-demo/) |
-| Bank soal defense (S4-08) | [`docs/07-defense/BANK_SOAL_DEFENSE.md`](docs/07-defense/BANK_SOAL_DEFENSE.md) |
+| Slide presentasi (S4-06) | [`docs/05-presentation/pitch-deck.html`](docs/05-presentation/pitch-deck.html), struktur: [`docs/05-presentation/S4-06_struktur-pitch-deck.docx`](docs/05-presentation/S4-06_struktur-pitch-deck.docx) |
+| Protokol gladi bersih & berita acara (S4-07) | [`docs/06-demo/S4-07_protokol-gladi-bersih-dan-live-demo.docx`](docs/06-demo/S4-07_protokol-gladi-bersih-dan-live-demo.docx), [`docs/06-demo/`](docs/06-demo/) |
+| Bank soal defense (S4-08) | [`docs/07-defense/BANK_SOAL_DEFENSE.docx`](docs/07-defense/BANK_SOAL_DEFENSE.docx) |
 
 Indeks lengkap: [`docs/README.md`](docs/README.md).
 
