@@ -19,6 +19,9 @@
 /public/storage
 /storage/*.key
 /storage/pail
+# Database lokal / snapshot uji jangan pernah di-commit (bisa berisi kredensial)
+*.sqlite
+/storage/framework/*.sqlite
 /vendor
 Homestead.json
 Homestead.yaml
