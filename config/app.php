@@ -54,6 +54,10 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Alamat publik untuk QR meja yang dicetak (dibuka dari HP pelanggan),
+    // mis. http://192.168.1.10:8000. Kosong = pakai host request saat cetak.
+    'public_url' => env('APP_PUBLIC_URL'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

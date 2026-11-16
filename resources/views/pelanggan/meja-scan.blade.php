@@ -45,9 +45,38 @@
 </style>
 
 <div class="scan-wrap">
-    <a href="{{ route('pelanggan.dashboard') }}" class="scan-back">
-        <i data-lucide="arrow-left" class="h-4 w-4"></i> Beranda
+    <a href="{{ auth()->check() ? route('pelanggan.dashboard') : route('pelanggan.menu') }}" class="scan-back">
+        <i data-lucide="arrow-left" class="h-4 w-4"></i> {{ auth()->check() ? 'Beranda' : 'Lihat Menu' }}
     </a>
+
+    {{-- Perkenalan aplikasi: pengunjung baru tahu ini aplikasi apa sebelum login --}}
+    <div class="scan-card" style="margin-bottom:14px;">
+        <div class="scan-eyebrow">Tentang Aplikasi</div>
+        <h2 class="scan-title" style="margin-top:6px;">Tejas Coffee — Pesan Langsung dari Meja</h2>
+        <p class="scan-text" style="margin-top:6px;">
+            Ini aplikasi pemesanan Tejas Coffee. Cukup pindai QR di meja untuk melihat status meja,
+            memesan tanpa membuat akun, membayar dengan QRIS, lalu memantau pesanan sampai siap diambil.
+        </p>
+        <ul class="scan-list">
+            <li>
+                <a href="{{ route('pelanggan.menu') }}">Lihat menu &amp; pesan<span>Tanpa akun</span></a>
+            </li>
+            <li>
+                <a href="{{ route('login') }}">Masuk sebagai member<span>Poin &amp; riwayat</span></a>
+            </li>
+        </ul>
+    </div>
+
+    @if (session('error'))
+        <div class="scan-alert" role="alert">{{ session('error') }}</div>
+    @endif
+
+    @if (session('success'))
+        <div class="scan-alert" role="status"
+             style="border-color:#2F4A33;background:rgba(47,74,51,.32);color:#86E0A4;">
+            {{ session('success') }}
+        </div>
+    @endif
 
     @if ($errors->any())
         <div class="scan-alert">
@@ -66,6 +95,13 @@
             <span class="scan-dot" style="background: {{ $labelWarna }};"></span>
             {{ $state['label'] }}
         </span>
+
+        @if ($kodeKasirDetik !== null)
+            <div class="scan-alert" style="margin:14px 0 0;border-color:#2F4A33;background:rgba(47,74,51,.32);color:#86E0A4;">
+                Kehadiran Anda di meja ini sudah terverifikasi lewat kode kasir.
+                BERLAKU {{ (int) ceil($kodeKasirDetik / 60) }} menit lagi.
+            </div>
+        @endif
 
         @if ($bisaKlaim)
             <h2 class="scan-title">Meja ini kosong</h2>
@@ -226,8 +262,196 @@
                 <p class="scan-foot">Belum ada meja kosong saat ini. Silakan hubungi staf kami.</p>
             @endif
         @endif
+
+        <div class="scan-verify" data-pin
+             data-minta-url="{{ route('meja.pin.minta', ['meja' => $meja->qr_token]) }}"
+             data-status-url="{{ route('meja.pin.status', ['meja' => $meja->qr_token]) }}">
+            <div class="scan-eyebrow">PIN dari Kasir</div>
+            <p class="scan-text" style="margin-top:6px;">
+                Tekan tombol di bawah, lalu kasir mengirim PIN 6 angka ke halaman ini.
+                PIN hanya tampil <b>1 menit</b>; bila terlewat, tekan <b>Minta ulang</b>.
+            </p>
+
+            <div class="scan-actions">
+                <button type="button" class="scan-btn scan-btn-primary" data-pin-minta>
+                    <i data-lucide="bell-ring" class="h-4 w-4"></i> Minta PIN ke Kasir
+                </button>
+            </div>
+
+            <div class="scan-code" data-pin-hasil hidden>
+                <div>
+                    <small>PIN meja Anda</small>
+                    <strong data-pin-kode>------</strong>
+                </div>
+                <div style="text-align:right;">
+                    <small>Berlaku</small>
+                    <strong style="font-size:15px;letter-spacing:normal;" data-pin-sisa>1:00</strong>
+                </div>
+            </div>
+
+            <p class="scan-foot" data-pin-pesan aria-live="polite" style="margin-top:10px;"></p>
+
+            <div class="scan-actions" data-pin-ulang-wrap hidden>
+                <button type="button" class="scan-btn scan-btn-ghost" data-pin-ulang>
+                    <i data-lucide="refresh-cw" class="h-4 w-4"></i> Minta ulang PIN
+                </button>
+            </div>
+        </div>
+
+        <div class="scan-verify">
+            <div class="scan-eyebrow">Sudah punya PIN?</div>
+            <p class="scan-text" style="margin-top:6px;">
+                Minta kode 6 angka ke kasir atau barista, lalu masukkan di sini.
+                Kode berlaku {{ (int) round(\App\Services\MejaKodeService::TTL_DETIK / 60) }} menit,
+                hanya bisa dipakai sekali, dan menjadi bukti kehadiran Anda tanpa perlu GPS.
+            </p>
+
+            {{-- Tamu tanpa akun juga boleh memakai PIN: PIN-lah bukti kehadirannya. --}}
+            <form method="POST" action="{{ route('meja.kode.verifikasi', ['meja' => $meja->qr_token]) }}">
+                @csrf
+                <label for="kode_meja" class="sr-only">Kode dari kasir</label>
+                <input type="text" id="kode_meja" name="kode_meja"
+                       class="scan-input" value="{{ old('kode_meja') }}"
+                       inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                       placeholder="123456" required>
+                <button type="submit" class="scan-btn scan-btn-primary" style="margin-top:10px;">
+                    <i data-lucide="shield-check" class="h-4 w-4"></i> Verifikasi kode
+                </button>
+            </form>
+        </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var box = document.querySelector('[data-pin]');
+    if (!box) return;
+
+    var mintaUrl = box.dataset.mintaUrl;
+    var statusUrl = box.dataset.statusUrl;
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var csrf = csrfMeta ? csrfMeta.content : '';
+    var btn = box.querySelector('[data-pin-minta]');
+    var ulangWrap = box.querySelector('[data-pin-ulang-wrap]');
+    var ulang = box.querySelector('[data-pin-ulang]');
+    var hasil = box.querySelector('[data-pin-hasil]');
+    var kodeEl = box.querySelector('[data-pin-kode]');
+    var sisaEl = box.querySelector('[data-pin-sisa]');
+    var pesan = box.querySelector('[data-pin-pesan]');
+    var timer = null;
+    var poller = null;
+    var sisa = 0;
+
+    function setPesan(teks) { pesan.textContent = teks; }
+
+    function detik(teks) {
+        sisaEl.textContent = Math.floor(teks / 60) + ':' + String(teks % 60).padStart(2, '0');
+    }
+
+    function mulaiHitung(detikAwal) {
+        clearInterval(timer);
+        sisa = Number(detikAwal) || 0;
+        hasil.hidden = false;
+        ulangWrap.hidden = true;
+        detik(sisa);
+
+        timer = setInterval(function () {
+            sisa -= 1;
+
+            if (sisa <= 0) {
+                clearInterval(timer);
+                hasil.hidden = true;
+                ulangWrap.hidden = false;
+                setPesan('PIN sudah kedaluwarsa. Tekan Minta ulang agar kasir mengirim PIN baru.');
+                return;
+            }
+
+            detik(sisa);
+        }, 1000);
+    }
+
+    function tampilkan(pin) {
+        hentikanPolling();
+        kodeEl.textContent = pin.kode;
+        mulaiHitung(pin.sisa_detik);
+        setPesan('PIN diterima. Masukkan PIN di kolom di bawah sebelum waktunya habis.');
+    }
+
+    function hentikanPolling() {
+        if (poller) { clearInterval(poller); poller = null; }
+    }
+
+    function mulaiPolling() {
+        if (poller) return;
+
+        poller = setInterval(function () {
+            fetch(statusUrl, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data) return;
+
+                    if (data.status === 'siap') {
+                        tampilkan(data);
+                    } else if (data.status === 'tidak_ada') {
+                        hentikanPolling();
+                        ulangWrap.hidden = false;
+                        setPesan('Permintaan belum diproses kasir. Tekan Minta PIN lagi.');
+                    }
+                })
+                .catch(function () { /* coba lagi di polling berikutnya */ });
+        }, 2000);
+    }
+
+    function minta() {
+        btn.disabled = true;
+        ulang.disabled = true;
+        setPesan('Menghubungi kasir…');
+
+        fetch(mintaUrl, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+            cache: 'no-store',
+        })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+                btn.disabled = false;
+                ulang.disabled = false;
+
+                if (!res.ok) {
+                    setPesan(res.data.message || 'Gagal meminta PIN. Coba lagi.');
+                    return;
+                }
+
+                ulangWrap.hidden = true;
+                setPesan(res.data.message || 'Menunggu kasir mengirim PIN…');
+                mulaiPolling();
+            })
+            .catch(function () {
+                btn.disabled = false;
+                ulang.disabled = false;
+                setPesan('Jaringan bermasalah. Coba lagi.');
+            });
+    }
+
+    btn.addEventListener('click', minta);
+    ulang.addEventListener('click', minta);
+
+    // Halaman dimuat ulang saat PIN masih berlaku: ambil lagi tanpa minta baru.
+    fetch(statusUrl, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+            if (!data) return;
+
+            if (data.status === 'siap') {
+                tampilkan(data);
+            } else if (data.status === 'menunggu') {
+                setPesan('Menunggu kasir mengirim PIN…');
+                mulaiPolling();
+            }
+        })
+        .catch(function () { /* diamkan */ });
+})();
+</script>
 
 @include('pelanggan._nav')
 @endsection

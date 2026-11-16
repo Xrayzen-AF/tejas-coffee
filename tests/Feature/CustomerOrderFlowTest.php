@@ -8,6 +8,7 @@ use App\Models\Pelanggan;
 use App\Models\Pengguna;
 use App\Models\Pesanan;
 use App\Models\Produk;
+use App\Models\ReservasiMeja;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -76,7 +77,7 @@ class CustomerOrderFlowTest extends TestCase
             ->assertSessionHas('error');
     }
 
-    public function test_checkout_membutuhkan_meja_untuk_dine_in(): void
+    public function test_checkout_dine_in_tanpa_check_in_ditolak_dan_diarahkan_scan_qr(): void
     {
         $produk = $this->buatMenu();
         $pelanggan = $this->pelanggan();
@@ -86,7 +87,43 @@ class CustomerOrderFlowTest extends TestCase
 
         $this->post(route('pelanggan.checkout.simpan'), [
             'tipe_pesanan' => 'dine-in',
-        ])->assertSessionHasErrors('id_meja');
+        ])
+            ->assertRedirect(route('pelanggan.meja.pindai'))
+            ->assertSessionHas('error');
+
+        // Tidak ada pesanan yang tercipta dengan meja kosong.
+        $this->assertNull(Pesanan::latest('id_pesanan')->first());
+    }
+
+    public function test_checkout_dine_in_memakai_meja_dari_sesi_check_in(): void
+    {
+        $produk = $this->buatMenu();
+        $pengguna = $this->pelanggan();
+        $meja = Meja::create(['nomor_meja' => 'T7', 'kapasitas' => 4]);
+
+        $member = Pelanggan::create([
+            'nama_pelanggan' => $pengguna->nama_lengkap,
+            'nomor_telepon' => $pengguna->nomor_telepon,
+            'poin_loyalitas' => 0,
+        ]);
+
+        ReservasiMeja::create([
+            'id_meja' => $meja->id_meja,
+            'id_pelanggan' => $member->id_pelanggan,
+            'kode_booking' => 'BK-T7',
+            'status' => 'aktif',
+            'dicek_in_pada' => now(),
+            'berakhir_pada' => now()->addMinutes(90),
+        ]);
+
+        $this->actingAs($pengguna)
+            ->post(route('pelanggan.keranjang.tambah', $produk->id_produk));
+
+        $this->post(route('pelanggan.checkout.simpan'), [
+            'tipe_pesanan' => 'dine-in',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($meja->id_meja, Pesanan::latest('id_pesanan')->first()->id_meja);
     }
 
     public function test_alur_lengkap_pesan_hingga_status_dan_stok_berkurang(): void
@@ -95,14 +132,29 @@ class CustomerOrderFlowTest extends TestCase
         $meja = Meja::create(['nomor_meja' => 'T1', 'kapasitas' => 4]);
         $pelanggan = $this->pelanggan();
 
+        // Meja dari scan/check-in (wajib sebelum dine-in).
+        $member = Pelanggan::create([
+            'nama_pelanggan' => $pelanggan->nama_lengkap,
+            'nomor_telepon' => $pelanggan->nomor_telepon,
+            'poin_loyalitas' => 0,
+        ]);
+
+        ReservasiMeja::create([
+            'id_meja' => $meja->id_meja,
+            'id_pelanggan' => $member->id_pelanggan,
+            'kode_booking' => 'BK-T1',
+            'status' => 'aktif',
+            'dicek_in_pada' => now(),
+            'berakhir_pada' => now()->addMinutes(90),
+        ]);
+
         // 1. Tambah ke keranjang
         $this->actingAs($pelanggan)
             ->post(route('pelanggan.keranjang.tambah', $produk->id_produk), ['jumlah' => 2]);
 
-        // 2. Checkout dine-in dengan meja
+        // 2. Checkout dine-in dengan meja dari sesi scan
         $response = $this->post(route('pelanggan.checkout.simpan'), [
             'tipe_pesanan' => 'dine-in',
-            'id_meja' => $meja->id_meja,
             'catatan' => 'less sugar',
         ]);
 
@@ -156,11 +208,10 @@ class CustomerOrderFlowTest extends TestCase
         $this->assertSame('diproses', $pesanan->fresh()->status_pesanan);
     }
 
-    public function test_non_pelanggan_dilarang_akses_menu(): void
+    public function test_menu_publik_bisa_dibuka_tanpa_login(): void
     {
-        $this->actingAs(Pengguna::factory()->create(['peran' => 'kasir']))
-            ->get(route('pelanggan.menu'))
-            ->assertForbidden();
+        // Alur hybrid: menú terbuka untuk tamu tanpa akun.
+        $this->get(route('pelanggan.menu'))->assertOk();
     }
 
     public function test_pelanggan_tak_bisa_melihat_status_milik_orang_lain(): void
@@ -327,6 +378,20 @@ class CustomerOrderFlowTest extends TestCase
             'tipe_pesanan' => 'takeaway',
             'items' => [['id_produk' => $produk->id_produk, 'jumlah' => 1, 'harga_satuan' => 1]],
         ])->assertStatus(422);
+    }
+
+    public function test_api_dine_in_tanpa_meja_ditolak(): void
+    {
+        $produk = $this->buatMenu();
+
+        $this->actingAs($this->pelanggan())
+            ->postJson('/api/orders', [
+                'tipe_pesanan' => 'dine-in',
+                'items' => [['id_produk' => $produk->id_produk, 'jumlah' => 1]],
+            ])
+            ->assertStatus(422);
+
+        $this->assertNull(Pesanan::latest('id_pesanan')->first());
     }
 
     public function test_api_pelanggan_tak_bisa_memakai_member_orang(): void

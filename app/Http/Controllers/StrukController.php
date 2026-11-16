@@ -26,9 +26,20 @@ class StrukController extends Controller
 
         $pengguna = $request->user();
 
-        // S3-01 (anti-IDOR): staf bebas, pelanggan hanya struk miliknya sendiri.
-        // Otorisasi ini melempar 403 bila pesanan bukan milik pengguna yang login.
-        $this->authorize('view', $pesanan);
+        // Tamu tanpa akun hanya boleh melihat struk pesanan yang tercatat
+        // pada sesi perangkatnya (hasil checkout tamu).
+        $milikTamu = in_array(
+            (int) $pesanan->id_pesanan,
+            array_map('intval', (array) $request->session()->get('tamu_pesanan', [])),
+            true,
+        );
+
+        if ($pengguna) {
+            // S3-01 (anti-IDOR): staf bebas, pelanggan hanya struk miliknya sendiri.
+            $this->authorize('view', $pesanan);
+        } elseif (! $milikTamu) {
+            abort(403, 'Bukan pesanan milik Anda.');
+        }
 
         $staf = $pengguna?->isKasir() || $pengguna?->isAdmin();
 
@@ -41,7 +52,8 @@ class StrukController extends Controller
             'pesanan' => $pesanan,
             'toko' => SettingController::load(),
             'nomorAntrian' => max(1, $nomorAntrian),
-            'bolehCetak' => $staf,
+            // Tamu pemilik sesi juga boleh mencetak/menyimpan struknya.
+            'bolehCetak' => $staf || $milikTamu,
             'autoPrint' => $request->boolean('print'),
         ]);
     }

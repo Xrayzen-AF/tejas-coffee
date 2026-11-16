@@ -17,6 +17,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LokasiController;
+use App\Http\Controllers\MejaKodeController;
 use App\Http\Controllers\MejaQrController;
 use App\Http\Controllers\MidtransPaymentController;
 use App\Http\Controllers\ProfilController;
@@ -54,6 +55,23 @@ Route::get('/meja/{meja:qr_token}', [MejaQrController::class, 'show'])->name('me
 Route::post('/meja/{meja:qr_token}/verifikasi', [MejaQrController::class, 'verifikasi'])
     ->middleware('throttle:6,1')
     ->name('meja.verifikasi');
+
+// Verifikasi kode sekali pakai dari kasir. Sengaja di luar group ber-geofence:
+// tamu yang tertahan GPS harus tetap bisa membuktikan kehadirannya lewat kode.
+Route::post('/meja/{meja:qr_token}/kode', [MejaQrController::class, 'verifikasiKode'])
+    ->middleware('throttle:15,1')
+    ->name('meja.kode.verifikasi');
+
+// Permintaan PIN ke kasir + notifikasi PIN (berlaku 1 menit) ke pelanggan.
+// Publik karena tamu tanpa akun pun harus bisa memesan dari meja.
+Route::post('/meja/{meja:qr_token}/pin', [MejaQrController::class, 'mintaPin'])
+    ->middleware('throttle:20,1')
+    ->name('meja.pin.minta');
+// Polling tiap 2 detik. Batas per-IP dibuat longgar karena semua tamu di
+// cafe biasanya berbagi satu IP WiFi (1 perangkat ≈ 30 permintaan/menit).
+Route::get('/meja/{meja:qr_token}/pin', [MejaQrController::class, 'pinStatus'])
+    ->middleware('throttle:600,1')
+    ->name('meja.pin.status');
 
 // ============================================================
 // DASHBOARD PER ROLE — dilindungi middleware 'role'
@@ -129,6 +147,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::delete('/orders/{pesanan}', [OrderManagementController::class, 'destroy'])->name('orders.destroy');
 });
 
+// Kode sekali pakai per meja: bukti tamu benar-benar di meja (pengganti GPS).
+Route::middleware(['auth', 'role:kasir,barista'])->prefix('kode-meja')->name('meja-kode.')->group(function () {
+    Route::get('/', [MejaKodeController::class, 'index'])->name('index');
+    Route::get('/status', [MejaKodeController::class, 'status'])->name('status');
+    Route::post('/{meja}/terbitkan', [MejaKodeController::class, 'terbitkan'])->name('terbitkan');
+    Route::delete('/{meja}', [MejaKodeController::class, 'batalkan'])->name('batalkan');
+});
+
 Route::middleware(['auth', 'role:kasir'])->prefix('kasir')->name('kasir.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'kasir'])->name('dashboard');
     // Draf tiket POS: tambah/ubah item di session, lalu buat pesanan (Charge).
@@ -158,28 +184,16 @@ Route::middleware(['auth', 'role:pelanggan'])->prefix('pelanggan')->name('pelang
     Route::post('/lokasi/cek', [LokasiController::class, 'cek'])
         ->middleware('throttle:120,1')
         ->name('lokasi.cek');
+
+    // Pemindai QR meja harus tetap terbuka walau GPS belum lolos: kode meja
+    // adalah jalur cadangan resmi saat akurasi GPS terlalu kasar.
+    Route::get('/meja/pindai', [MejaQrController::class, 'pindai'])->name('meja.pindai');
 });
 
-// Seluruh halaman pelanggan lain wajib GPS aktif & di dalam radius cafe.
-Route::middleware(['auth', 'role:pelanggan', 'geofence'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'pelanggan'])->name('dashboard');
-    // Riwayat pesanan punya halaman sendiri, tidak lagi menumpang di beranda.
-    Route::get('/riwayat', [DashboardController::class, 'riwayat'])->name('riwayat');
-    // Status meja realtime (dipolling oleh panel "Status Meja" di beranda).
-    Route::get('/meja/status', [DashboardController::class, 'mejaStatusPelanggan'])->name('meja.status');
-
-    // Pemindai QR di dalam aplikasi (kamera). Harus di atas rute {meja:qr_token}
-    // agar "pindai" tidak dianggap token meja.
-    Route::get('/meja/pindai', [MejaQrController::class, 'pindai'])->name('meja.pindai');
-
-    // Check-in & lepas meja tetap wajib akun pelanggan.
-    // URL lama (/pelanggan/meja/...) diarahkan ke halaman scan publik.
-    Route::get('/meja/{meja:qr_token}', fn (Meja $meja) => redirect()
-        ->route('meja.scan', ['meja' => $meja->qr_token]))->name('meja.scan');
-    Route::post('/meja/{meja:qr_token}/checkin', [MejaQrController::class, 'checkin'])->name('meja.checkin');
-    Route::post('/meja/{meja:qr_token}/lepas', [MejaQrController::class, 'lepas'])->name('meja.lepas');
-
-    // Alur pemesanan: menu → kustom → keranjang → checkout → status
+// Alur pesan pelanggan: member login maupun tamu tanpa akun.
+// Geofence hanya menahan akun pelanggan (middleware meloloskan tamu);
+// pesanan dine-in tetap wajib punya meja dari sesi QR/kode kasir.
+Route::middleware(['geofence'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
     Route::get('/menu', [CartController::class, 'menu'])->name('menu');
     Route::get('/menu/{produk}/kustom', [CartController::class, 'kustom'])->name('menu.kustom');
     Route::post('/keranjang/tambah/{produk}', [CartController::class, 'tambah'])->name('keranjang.tambah');
@@ -192,21 +206,45 @@ Route::middleware(['auth', 'role:pelanggan', 'geofence'])->prefix('pelanggan')->
     Route::post('/keranjang/batal', [CartController::class, 'batalKeranjang'])->name('keranjang.batal');
     Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
     Route::post('/checkout', [CartController::class, 'simpanPesanan'])->name('checkout.simpan');
+    // Status meja untuk pemilih meja: terbuka sebelum login (tamu).
+    Route::get('/meja/status', [DashboardController::class, 'mejaStatusPelanggan'])->name('meja.status');
     Route::get('/pesanan/{nomorPesanan}', [CartController::class, 'status'])->name('status');
-    // Polling status untuk progres real-time (hanya milik sendiri).
+    // Polling status untuk progres real-time (pemilik akun atau sesi tamu).
     Route::get('/pesanan/{pesanan}/status-live', [CartController::class, 'statusLive'])->name('pesanan.status-live');
     Route::patch('/pesanan/{pesanan}/batal', [CartController::class, 'batalkan'])->name('pesanan.batal');
+    // Charge QRIS diprakarsai pelanggan (member/tamu) dari halaman status.
+    Route::post('/pesanan/{pesanan}/bayar-qris', [CartController::class, 'bayarQris'])->name('pesanan.bayar-qris');
+});
+
+// Seluruh halaman pelanggan lain wajib GPS aktif & di dalam radius cafe.
+Route::middleware(['auth', 'role:pelanggan', 'geofence'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'pelanggan'])->name('dashboard');
+    // Riwayat pesanan punya halaman sendiri, tidak lagi menumpang di beranda.
+    Route::get('/riwayat', [DashboardController::class, 'riwayat'])->name('riwayat');
+    // Status meja beranda member (route publiknya ada di atas).
+    Route::get('/meja/status-beranda', [DashboardController::class, 'mejaStatusPelanggan'])->name('meja.status.beranda');
+
+    // Check-in & lepas meja tetap wajib akun pelanggan.
+    // URL lama (/pelanggan/meja/...) diarahkan ke halaman scan publik.
+    Route::get('/meja/{meja:qr_token}', fn (Meja $meja) => redirect()
+        ->route('meja.scan', ['meja' => $meja->qr_token]))->name('meja.scan');
+    Route::post('/meja/{meja:qr_token}/checkin', [MejaQrController::class, 'checkin'])->name('meja.checkin');
+    Route::post('/meja/{meja:qr_token}/lepas', [MejaQrController::class, 'lepas'])->name('meja.lepas');
+
+    // "Pesan Lagi" tetap khusus member karena berbasis riwayat akun.
+    Route::post('/riwayat/{nomorPesanan}/pesan-lagi', [CartController::class, 'pesanLagi'])->name('riwayat.pesan-lagi');
 
     // Profil member + edit data akun.
     Route::get('/profil', [ProfilController::class, 'show'])->name('profil');
     Route::put('/profil', [ProfilController::class, 'update'])->name('profil.update');
 });
 
+// Struk pembayaran 80mm — kasir/admin, pelanggan pemilik, dan tamu pemilik sesi.
+// Otorisasi kepemilikan dilakukan di StrukController (bukan middleware auth).
+Route::get('/struk/{pesanan}', [StrukController::class, 'show'])->name('struk.show');
+
 // Aksi status pesanan & pembayaran dari dashboard kasir/barista (web form, RBAC)
 Route::middleware(['auth'])->group(function () {
-    // Struk pembayaran 80mm — kasir/admin dan pelanggan pemilik pesanan.
-    Route::get('/struk/{pesanan}', [StrukController::class, 'show'])->name('struk.show');
-
     Route::patch('/pesanan/{pesanan}/status', [DashboardController::class, 'updateStatus'])
         ->name('pesanan.status');
     Route::patch('/pesanan/{pesanan}/lunas', [DashboardController::class, 'tandaiLunas'])
@@ -214,11 +252,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pesanan/{pesanan}/snap-token', [DashboardController::class, 'snapToken'])
         ->name('pesanan.snap');
 
-    // Midtrans non-tunai: QRIS dinamis & virtual account transfer.
+    // Midtrans non-tunai: QRIS dinamis. Tunai ditangani langsung kasir.
     Route::post('/pesanan/{pesanan}/midtrans/qris', [MidtransPaymentController::class, 'qris'])
         ->name('pesanan.midtrans.qris');
-    Route::post('/pesanan/{pesanan}/midtrans/transfer', [MidtransPaymentController::class, 'transfer'])
-        ->name('pesanan.midtrans.transfer');
     Route::get('/pesanan/{pesanan}/midtrans/status', [MidtransPaymentController::class, 'status'])
         ->name('pesanan.midtrans.status');
 });

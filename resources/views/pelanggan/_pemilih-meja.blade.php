@@ -1,5 +1,7 @@
 @php
     $mpId = $mpId ?? 'id_meja';
+    // Meja hasil scan QR / PIN kasir / reservasi: terkunci, tidak bisa diganti.
+    $mpLocked = $mejaScan ?? null;
     $mpList = collect($mejaTersedia ?? [])->sortBy('nomor_meja')->values();
     $mpStatus = function ($status) {
         return in_array($status, ['terisi', 'dipesan'], true) ? $status : 'kosong';
@@ -10,6 +12,21 @@
     $mpLabel = fn ($status) => $status === 'terisi' ? 'Terisi' : ($status === 'dipesan' ? 'Dipesan' : 'Kosong');
 @endphp
 
+@if ($mpLocked)
+    <div class="mp-locked" style="display:flex;gap:10px;align-items:flex-start;border:1px solid #6B4A1F;background:rgba(217,119,6,.10);border-radius:10px;padding:12px 14px;">
+        <i data-lucide="lock" style="width:18px;height:18px;flex:none;margin-top:1px;color:#F6C89A;"></i>
+        <div>
+            <div style="font-size:13px;font-weight:700;color:#F6C89A;">
+                Meja {{ $mpLocked->nomor_meja }} · {{ $mpLocked->kapasitas }} kursi
+            </div>
+            <div style="margin-top:3px;font-size:11px;line-height:1.55;color:#B8A8A1;">
+                Meja ini terkunci dari scan QR. Pesanan makan di tempat otomatis memakai meja ini
+                dan tidak bisa diganti. Untuk pindah meja, lepas dulu meja Anda lewat halaman meja.
+            </div>
+        </div>
+    </div>
+    <input type="hidden" name="id_meja" id="{{ $mpId }}" value="{{ $mpLocked->id_meja }}">
+@else
 <div class="mp" data-mp data-endpoint="{{ route('pelanggan.meja.status') }}">
     <input type="hidden" name="id_meja" id="{{ $mpId }}" value="{{ $mpSelectedRow?->id_meja }}">
 
@@ -56,11 +73,11 @@
                     </span>
                 </button>
             @empty
-                <p class="mp-empty">Belum ada meja terdaftar.</p>
+                <p class="mp-empty">Semua meja sedang terpakai. Minta bantuan kasir atau pindai QR di meja Anda.</p>
             @endforelse
         </div>
 
-        <p class="mp-foot">Status diperbarui otomatis · meja terisi tetap bisa dipilih</p>
+        <p class="mp-foot">Hanya meja kosong yang bisa dipilih · status diperbarui otomatis</p>
     </div>
 </div>
 
@@ -266,3 +283,4 @@
   });
 })();
 </script>
+@endif

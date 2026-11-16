@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\MejaKodeService;
 use App\Support\CafeGeofence;
 use Closure;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class EnsureWithinCafeGeofence
 {
+    public function __construct(private readonly MejaKodeService $kodeMeja) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         if (! CafeGeofence::active()) {
@@ -28,6 +31,12 @@ class EnsureWithinCafeGeofence
         }
 
         if ($this->sessionValid($request, (int) $user->getKey())) {
+            return $next($request);
+        }
+
+        // Jalur alternatif: tamu yang sudah memverifikasi kode sekali pakai
+        // dari kasir sedang terbukti ada di meja, jadi tidak perlu GPS.
+        if ($this->kodeMeja->sesiValid($request, (int) $user->getKey())) {
             return $next($request);
         }
 

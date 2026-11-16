@@ -83,6 +83,17 @@
       </div>
     @endif
 
+    @if ($errors->any())
+      <div class="geo-alert" role="alert">
+        <span aria-hidden="true">⚠</span>
+        <span>
+          @foreach ($errors->all() as $error)
+            <span style="display:block;">{{ $error }}</span>
+          @endforeach
+        </span>
+      </div>
+    @endif
+
     <div id="geoStatus" class="geo-status {{ $terverifikasi ? 'is-ok' : '' }}" role="status" aria-live="polite">
       <strong id="geoStatusTitle">{{ $terverifikasi ? 'Terverifikasi' : 'GPS belum dicek' }}</strong>
       <span id="geoStatusText">
@@ -114,6 +125,11 @@
         </button>
       </form>
 
+      <a href="{{ route('pelanggan.meja.pindai') }}" id="geoFallback" class="geo-btn-ghost"
+         style="display:none;text-decoration:none;text-align:center;border-color:#6B4A1F;color:#F6C89A;">
+        Verifikasi lewat QR meja / kode kasir
+      </a>
+
       <form method="POST" action="{{ route('logout') }}" style="margin:0;">
         @csrf
         <button type="submit" class="geo-btn-ghost">Keluar dari akun</button>
@@ -131,6 +147,12 @@
         browser ini diatur ke <b>Allow</b>, lalu muat ulang halaman. Di laptop, aktifkan
         Location di pengaturan sistem. Sinyal lemah di dalam ruangan — coba dekat jendela.
       </div>
+
+      <div class="geo-steps">
+        <b>Sudah di dalam cafe tapi GPS tetap gagal?</b> Pindai QR yang tertempel di meja
+        Anda dengan kamera, lalu minta <b>kode 6 angka</b> ke kasir atau barista. Kode itu
+        menjadi bukti kehadiran Anda dan membuka akses pemesanan tanpa GPS.
+      </div>
     @endif
   </div>
 </main>
@@ -139,6 +161,14 @@
 <script>
 (function () {
     var form = document.getElementById('geoForm');
+    var aman = window.isSecureContext
+        || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+    var fallback = document.getElementById('geoFallback');
+
+    // Tampilkan jalur cadangan resmi (QR meja / kode kasir) saat GPS gagal.
+    function tampilkanFallback(ya) {
+        if (fallback) fallback.style.display = ya ? 'block' : 'none';
+    }
     var btn = document.getElementById('geoBtn');
     var btnText = document.getElementById('geoBtnText');
     var btnSpin = document.getElementById('geoBtnSpin');
@@ -153,7 +183,8 @@
     var watchId = null;
     var timer = null;
     var selesai = false;
-    var cobaKasar = false;
+    var cobaPresisi = false;
+    var tahapSekarang = 'kasar';
 
     function aturStatus(kelas, judul, teks) {
         statusBox.className = 'geo-status ' + kelas;
@@ -163,6 +194,19 @@
 
     function proses() {
         if (mengirim || mencari) return;
+
+        // Browser memblokir Geolocation API di HTTP (kecuali localhost).
+        // Tanpa cek ini, kegagalannya muncul sebagai "timeout kode 3" yang menyesatkan.
+        if (!aman) {
+            btn.disabled = true;
+            tampilkanFallback(true);
+            aturStatus('is-err', 'GPS diblokir: halaman bukan HTTPS',
+                'Alamat <b>' + window.location.origin + '</b> memakai HTTP, jadi browser tidak mengizinkan GPS. ' +
+                'Buka aplikasi lewat <b>https://</b> (ngrok/Cloudflare Tunnel/hosting ber-SSL), ' +
+                'atau lewat <b>http://localhost</b> bila menguji di komputer sendiri. ' +
+                'Sementara itu, gunakan tombol verifikasi lewat kode meja di bawah.');
+            return;
+        }
 
         if (!('geolocation' in navigator)) {
             aturStatus('is-err', 'GPS tidak didukung',
@@ -174,7 +218,8 @@
         btnSpin.hidden = false;
         btnText.textContent = 'Membaca GPS…';
         aturStatus('is-wait', 'Memeriksa izin lokasi…', 'Pilih <b>Izinkan</b> bila browser menampilkan dialog lokasi.');
-        cobaKasar = false;
+        cobaPresisi = false;
+        tahapSekarang = 'kasar';
 
         // Izin yang sudah diblokir tidak perlu ditunggu sampai timeout.
         if (navigator.permissions && navigator.permissions.query) {
@@ -183,17 +228,18 @@
                     izinDitolak();
                     return;
                 }
-                mulaiPantau(true);
+                mulaiPantau('kasar');
             }).catch(function () {
-                mulaiPantau(true);
+                mulaiPantau('kasar');
             });
             return;
         }
 
-        mulaiPantau(true);
+        mulaiPantau('kasar');
     }
 
     function izinDitolak() {
+        tampilkanFallback(true);
         btn.disabled = false;
         btnSpin.hidden = true;
         btnText.textContent = 'Coba Lagi';
@@ -202,20 +248,26 @@
             'Klik ikon gembok di address bar → <b>Location</b> → <b>Allow</b>, lalu muat ulang halaman.');
     }
 
-    // Ambil beberapa sampel GPS berturut-turut, lalu pakai yang paling akurat.
-    function mulaiPantau(akurasiTinggi) {
+    // Pemakaian di dalam ruangan: mulai dari lokasi berbasis jaringan (jaringan/WiFi),
+    // bukan GPS presisi tinggi yang hampir selalu timeout di dalam gedung.
+    function mulaiPantau(tahap) {
         mencari = true;
-        best = null;
         selesai = false;
-        aturStatus('is-wait', akurasiTinggi ? 'Meminta izin lokasi…' : 'Mencoba sinyal GPS cadangan…',
+        tahapSekarang = tahap;
+
+        if (tahap === 'kasar') best = null;
+
+        aturStatus('is-wait', tahap === 'kasar' ? 'Meminta izin lokasi…' : 'Menstabilkan sinyal GPS…',
             'Pilih <b>Izinkan</b> pada dialog browser. Jangan tutup halaman ini.');
 
-        watchId = navigator.geolocation.watchPosition(terima, salah, {
-            enableHighAccuracy: akurasiTinggi !== false,
-            timeout: akurasiTinggi === false ? 15000 : 20000,
-            maximumAge: akurasiTinggi === false ? 60000 : 0
+        navigator.geolocation.getCurrentPosition(terima, salah, {
+            enableHighAccuracy: tahap === 'presisi',
+            timeout: 15000,
+            maximumAge: tahap === 'presisi' ? 0 : 30000
         });
-        timer = setTimeout(akhiri, akurasiTinggi === false ? 12000 : 15000);
+
+        clearTimeout(timer);
+        timer = setTimeout(akhiri, 16000);
     }
 
     function terima(pos) {
@@ -226,18 +278,41 @@
         }
 
         var akurasi = Math.round(best.coords.accuracy);
-        aturStatus('is-wait', 'Menstabilkan sinyal GPS…',
+        aturStatus('is-wait', 'Membaca posisi…',
             'Akurasi terbaik ±' + akurasi + ' m. ' +
             (akurasi <= targetAkurasi
                 ? 'Sinyal bagus, memverifikasi…'
                 : 'Diam sejenak di area terbuka sampai akurasi ≤ ±' + targetAkurasi + ' m.'));
 
-        if (akurasi <= targetAkurasi) akhiri();
+        if (akurasi <= targetAkurasi) {
+            akhiri();
+            return;
+        }
+
+        // Hasil kasar cukup untuk menembus dinding, tapi bila masih di atas
+        // batas server coba sekali pembacaan presisi tinggi sebelum menyerah.
+        if (tahapSekarang === 'kasar' && !cobaPresisi) {
+            cobaPresisi = true;
+            clearTimeout(timer);
+            mulaiPantau('presisi');
+        }
     }
 
-    // Kode 2/3 dari watchPosition sering hanya sementara; biarkan timer memutuskan.
     function salah(err) {
-        if (err && err.code === 1) gagal(err);
+        if (err && err.code === 1) {
+            gagal(err);
+            return;
+        }
+
+        // Kode 2/3 saat mode kasar: coba sekali mode presisi sebelum gagal.
+        if (tahapSekarang === 'kasar' && !cobaPresisi) {
+            cobaPresisi = true;
+            clearTimeout(timer);
+            mulaiPantau('presisi');
+            return;
+        }
+
+        gagal(err);
     }
 
     function akhiri() {
@@ -252,25 +327,20 @@
         }
 
         if (!best) {
-            // GPS presisi tinggi sering timeout di laptop/dalam ruangan.
-            // Coba sekali dengan akurasi kasar (berbasis jaringan) sebelum menyerah.
-            if (!cobaKasar) {
-                cobaKasar = true;
-                mulaiPantau(false);
-                return;
-            }
-
             gagal({ code: 3 });
             return;
         }
 
         if (best.coords.accuracy > batasAkurasi) {
+            tampilkanFallback(true);
             btn.disabled = false;
             btnSpin.hidden = true;
             btnText.textContent = 'Coba Lagi';
             aturStatus('is-err', 'Akurasi GPS belum cukup',
                 'Akurasi terbaik ±' + Math.round(best.coords.accuracy) + ' m, maksimal ±' + batasAkurasi + ' m. ' +
-                'Nyalakan GPS presisi tinggi dan keluar ke area terbuka, lalu coba lagi.');
+                'Laptop/PC biasanya hanya memakai lokasi WiFi (±100–1000 m), jadi radius ' + {{ $radius }} + ' m tidak bisa dipastikan. ' +
+                'Di HP: nyalakan GPS presisi tinggi dan keluar ke area terbuka. ' +
+                'Cara paling cepat: gunakan <b>QR meja + kode kasir</b> lewat tombol di bawah.');
             return;
         }
 
@@ -306,19 +376,22 @@
         if (err.code === 1) {
             izinDitolak();
         } else if (err.code === 2) {
-            aturStatus('is-err', 'Sinyal GPS tidak tersedia',
+            tampilkanFallback(true);
+            aturStatus('is-err', 'Posisi tidak tersedia (kode 2)',
                 'Perangkat melaporkan posisi tidak tersedia (kode 2). Nyalakan <b>Location</b> di pengaturan sistem ' +
-                '(Windows: Settings → Privacy & security → Location), lalu tekan Coba Lagi.');
+                '(Windows: Settings → Privacy & security → Location), matikan mode hemat baterai, lalu tekan Coba Lagi.');
         } else {
+            tampilkanFallback(true);
             aturStatus('is-err', 'GPS timeout (kode 3)',
-                'Sinyal tidak diterima dalam batas waktu, jadi posisi tidak bisa dipastikan. Periksa: izin lokasi ' +
-                '<b>Allow</b>, Location Windows menyala, tidak memakai mode hemat baterai, lalu coba lagi dekat jendela.');
+                'Posisi tidak diterima dalam 15 detik (kode 3). Pastikan izin lokasi <b>Allow</b>, Location menyala, ' +
+                'dan halaman dibuka lewat HTTPS. Coba lagi dekat jendela atau minta kode meja ke kasir.');
         }
     }
 
     btn.addEventListener('click', proses);
 
     // Langsung minta GPS saat halaman dibuka (memenuhi aturan "wajib GPS").
+    // Catatan: form memakai @csrf sehingga token terkirim bersama latitude/longitude.
     if (document.readyState === 'complete') {
         setTimeout(proses, 350);
     } else {

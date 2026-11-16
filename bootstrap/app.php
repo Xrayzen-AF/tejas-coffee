@@ -6,6 +6,9 @@ use App\Http\Middleware\PreventBackAfterLogout;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -41,5 +44,48 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Sesi/CSRF kedaluwarsa (419) tidak ditampilkan sebagai halaman error
+        // mentah: pengguna diarahkan kembali ke login / halaman asalnya.
+        // Catatan: Laravel mengubah TokenMismatchException menjadi
+        // HttpException(419) sebelum callback dipanggil, jadi statusnya yang dicek.
+        $exceptions->render(function (HttpException $e, Request $request) {
+            if ($e->getStatusCode() !== 419) {
+                return null;
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'code' => 'session_expired',
+                    'message' => 'Sesi sudah kedaluwarsa. Muat ulang halaman lalu coba lagi.',
+                ], 419);
+            }
+
+            $pesan = 'Sesi login sudah kedaluwarsa. Silakan coba lagi.';
+
+            if ($request->user()) {
+                return redirect()->back()->with('error', $pesan);
+            }
+
+            return redirect()->route('login')->with('error', $pesan);
+        });
+
+        // Throttle (429) jangan tampil sebagai halaman error mentah: beri pesan
+        // yang jelas + lama menunggu, karena ini sering terjadi saat pelanggan
+        // salah memasukkan PIN beberapa kali.
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
+            $tunggu = max(1, (int) ($e->getHeaders()['Retry-After'] ?? 60));
+            $pesan = 'Terlalu banyak percobaan. Tunggu '.$tunggu.' detik lalu coba lagi.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'code' => 'too_many_requests',
+                    'retry_after' => $tunggu,
+                    'message' => $pesan,
+                ], 429, $e->getHeaders());
+            }
+
+            return back()->with('error', $pesan);
+        });
     })->create();

@@ -30,6 +30,7 @@ class LoginController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
+            'remember' => ['nullable', 'boolean'],
         ], [
             'email.required' => 'Email / No. HP wajib diisi.',
             'password.required' => 'Password wajib diisi.',
@@ -42,7 +43,9 @@ class LoginController extends Controller
         $field = $isEmail ? 'email' : 'nomor_telepon';
         $value = $isEmail ? strtolower($loginInput) : $loginInput;
 
-        if (! Auth::attempt([$field => $value, 'password' => $password])) {
+        // "Ingat saya": cookie jangka panjang, jadi sesi yang kedaluwarsa
+        // tidak memaksa pengguna mengetik password lagi.
+        if (! Auth::attempt([$field => $value, 'password' => $password], $request->boolean('remember'))) {
             throw ValidationException::withMessages([
                 'email' => 'Email / No. HP atau password salah.',
             ]);

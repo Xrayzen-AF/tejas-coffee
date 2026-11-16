@@ -48,6 +48,9 @@ class GeofenceTest extends TestCase
             'cafe_latitude' => self::LAT,
             'cafe_longitude' => self::LNG,
             'radius_meter' => 150,
+            // Default uji: batas akurasi diturunkan dari radius, bukan nilai
+            // manual yang mungkin tersisa di store-settings.json mesin lokal.
+            'max_accuracy_meter' => null,
         ], $override);
 
         File::put(
@@ -164,6 +167,31 @@ class GeofenceTest extends TestCase
         $this->assertEqualsWithDelta(30.0, CafeGeofence::targetAccuracy(), 0.001);
     }
 
+    public function test_batas_akurasi_bisa_ditimpa_lewat_pengaturan(): void
+    {
+        $this->simpanSetting(['radius_meter' => 100, 'max_accuracy_meter' => 150]);
+        $this->assertEqualsWithDelta(150.0, CafeGeofence::maxAccuracy(), 0.001);
+
+        // Dikosongkan lagi -> kembali otomatis dari radius (35% x 100 m).
+        $this->simpanSetting(['radius_meter' => 100, 'max_accuracy_meter' => null]);
+        $this->assertEqualsWithDelta(35.0, CafeGeofence::maxAccuracy(), 0.001);
+    }
+
+    public function test_akurasi_wifi_diterima_bila_admin_melonggarkan_batas(): void
+    {
+        $this->simpanSetting(['radius_meter' => 100, 'max_accuracy_meter' => 150]);
+        $user = $this->pelanggan();
+
+        $this->actingAs($user)
+            ->post(route('pelanggan.lokasi.verifikasi'), [
+                'latitude' => self::LAT + 0.0002, // ±22 m
+                'longitude' => self::LNG,
+                'accuracy' => 113, // akurasi khas lokasi berbasis WiFi
+            ])
+            ->assertRedirect(route('pelanggan.dashboard'))
+            ->assertSessionHas(CafeGeofence::SESSION_KEY);
+    }
+
     public function test_hanya_separuh_akurasi_dipakai_sebagai_toleransi(): void
     {
         $this->assertEqualsWithDelta(70.0, CafeGeofence::effectiveDistance(100.0, 60.0), 0.001);
@@ -193,6 +221,78 @@ class GeofenceTest extends TestCase
             ])
             ->assertSessionMissing(CafeGeofence::SESSION_KEY)
             ->assertSessionHas('error');
+    }
+
+    public function test_pemindai_qr_meja_tetap_terbuka_saat_gps_belum_lolos(): void
+    {
+        $this->simpanSetting();
+
+        // Jalur cadangan resmi: jangan ikut ditahan middleware geofence.
+        $this->actingAs($this->pelanggan())
+            ->get(route('pelanggan.meja.pindai'))
+            ->assertOk();
+    }
+
+    public function test_gerbang_gps_menyediakan_tautan_kode_meja(): void
+    {
+        $this->simpanSetting();
+
+        $this->actingAs($this->pelanggan())
+            ->get(route('pelanggan.lokasi'))
+            ->assertOk()
+            ->assertSee('Verifikasi lewat QR meja / kode kasir')
+            ->assertSee(route('pelanggan.meja.pindai'), false);
+    }
+
+    public function test_koordinat_wajib_numerik_dan_tidak_boleh_kosong(): void
+    {
+        $this->simpanSetting();
+        $user = $this->pelanggan();
+
+        $this->actingAs($user)
+            ->post(route('pelanggan.lokasi.verifikasi'), ['accuracy' => 10])
+            ->assertSessionHasErrors(['latitude', 'longitude']);
+
+        $this->actingAs($user)
+            ->post(route('pelanggan.lokasi.verifikasi'), [
+                'latitude' => 'bukan-angka',
+                'longitude' => 'bukan-angka',
+                'accuracy' => 10,
+            ])
+            ->assertSessionHasErrors(['latitude', 'longitude']);
+
+        $this->actingAs($user)
+            ->post(route('pelanggan.lokasi.verifikasi'), [
+                'latitude' => 95,
+                'longitude' => 200,
+                'accuracy' => 10,
+            ])
+            ->assertSessionHasErrors(['latitude', 'longitude']);
+
+        $this->assertNull(session(CafeGeofence::SESSION_KEY));
+    }
+
+    public function test_watchdog_menolak_koordinat_tidak_valid_dengan_json(): void
+    {
+        $this->simpanSetting();
+
+        $this->actingAs($this->pelanggan())
+            ->postJson(route('pelanggan.lokasi.cek'), [
+                'latitude' => 95,
+                'longitude' => 200,
+                'accuracy' => 10,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['latitude', 'longitude']);
+    }
+
+    public function test_haversine_akurat_untuk_jarak_pendek(): void
+    {
+        // 0,001 derajat lintang ≈ 111,2 meter.
+        $this->assertEqualsWithDelta(111.2, CafeGeofence::distance(0.0, 0.0, 0.001, 0.0), 0.5);
+
+        // Titik yang sama harus menghasilkan 0 (bukan NaN).
+        $this->assertEqualsWithDelta(0.0, CafeGeofence::distance(self::LAT, self::LNG, self::LAT, self::LNG), 0.0001);
     }
 
     public function test_verifikasi_kedaluwarsa_setelah_ttl(): void

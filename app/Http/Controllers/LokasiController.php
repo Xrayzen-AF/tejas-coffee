@@ -52,7 +52,7 @@ class LokasiController extends Controller
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['required', 'numeric', 'min:0', 'max:100000'],
-        ]);
+        ], $this->pesanValidasiGps());
 
         $s = CafeGeofence::settings();
         $akurasi = (float) $v['accuracy'];
@@ -108,26 +108,27 @@ class LokasiController extends Controller
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['required', 'numeric', 'min:0', 'max:100000'],
-        ], [
-            'latitude.required' => 'Koordinat GPS tidak terbaca. Pastikan GPS aktif lalu coba lagi.',
-            'longitude.required' => 'Koordinat GPS tidak terbaca. Pastikan GPS aktif lalu coba lagi.',
-            'accuracy.required' => 'Akurasi GPS tidak terbaca. Coba di area terbuka.',
-        ]);
+        ], $this->pesanValidasiGps());
 
         $s = CafeGeofence::settings();
         $akurasi = (float) $v['accuracy'];
 
         if ($akurasi > CafeGeofence::maxAccuracy()) {
-            return back()->with('error', 'Sinyal GPS terlalu lemah (akurasi ±'.round($akurasi).' m, maksimal ±'.round(CafeGeofence::maxAccuracy()).' m). Pindah ke area terbuka lalu coba lagi.');
+            $pesan = 'Sinyal GPS terlalu lemah (akurasi ±'.round($akurasi).' m, maksimal ±'.round(CafeGeofence::maxAccuracy()).' m). Pindah ke area terbuka lalu coba lagi.';
+
+            return back()->withInput()->withErrors(['accuracy' => $pesan])->with('error', $pesan);
         }
 
         $jarak = CafeGeofence::distance((float) $v['latitude'], (float) $v['longitude'], $s['latitude'], $s['longitude']);
         $jarakEfektif = CafeGeofence::effectiveDistance($jarak, $akurasi);
 
         if ($jarakEfektif > $s['radius']) {
+            $pesan = 'Kamu berada ±'.round($jarak).' m dari cafe, sedangkan radius yang diizinkan hanya '.$s['radius'].' m. Datang ke cafe untuk memesan, atau minta kode meja ke kasir.';
+
             return back()
                 ->withInput()
-                ->with('error', 'Kamu berada ±'.round($jarak).' m dari cafe, sedangkan radius yang diizinkan hanya '.$s['radius'].' m. Datang ke cafe untuk memesan.');
+                ->withErrors(['lokasi' => $pesan])
+                ->with('error', $pesan);
         }
 
         $request->session()->put(CafeGeofence::SESSION_KEY, [
@@ -143,5 +144,24 @@ class LokasiController extends Controller
 
         return redirect($tujuan ?: route('pelanggan.dashboard'))
             ->with('success', 'Lokasi terverifikasi — kamu berada ±'.round($jarak).' m dari cafe.');
+    }
+
+    /**
+     * Pesan validasi koordinat yang bisa ditindaklanjuti pelanggan.
+     *
+     * @return array<string, string>
+     */
+    private function pesanValidasiGps(): array
+    {
+        return [
+            'latitude.required' => 'Koordinat latitude tidak terkirim. Aktifkan GPS lalu coba lagi.',
+            'latitude.numeric' => 'Latitude harus berupa angka desimal.',
+            'latitude.between' => 'Latitude harus di antara -90 dan 90.',
+            'longitude.required' => 'Koordinat longitude tidak terkirim. Aktifkan GPS lalu coba lagi.',
+            'longitude.numeric' => 'Longitude harus berupa angka desimal.',
+            'longitude.between' => 'Longitude harus di antara -180 dan 180.',
+            'accuracy.required' => 'Akurasi GPS tidak terbaca. Coba lagi di area terbuka.',
+            'accuracy.numeric' => 'Akurasi GPS harus berupa angka (meter).',
+        ];
     }
 }

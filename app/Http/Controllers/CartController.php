@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Admin\SettingController;
 use App\Models\Kategori;
+use App\Models\Meja;
 use App\Models\Pelanggan;
 use App\Models\Pesanan;
 use App\Models\Produk;
 use App\Models\Promo;
+use App\Models\ReservasiMeja;
+use App\Services\MejaKodeService;
+use App\Services\MidtransService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +23,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 class CartController extends Controller
 {
+    public function __construct(
+        private readonly MejaKodeService $kodeMeja,
+        private readonly MidtransService $midtrans,
+    ) {}
+
     /** Katalog menu + filter kategori + pencarian. */
     public function menu(Request $request)
     {
@@ -286,7 +295,7 @@ class CartController extends Controller
     }
 
     /** Halaman keranjang (Step 02): review + tipe + voucher + poin + rekomendasi. */
-    public function index()
+    public function index(Request $request)
     {
         $items = $this->items();
         $pengguna = auth()->user();
@@ -305,21 +314,25 @@ class CartController extends Controller
             ->limit(3)
             ->get();
 
-        $mejaTersedia = DB::table('meja')->orderBy('nomor_meja')->get();
-        $mejaDipilih = session('checkout_meja');
-        $mejaDipilihNomor = $mejaDipilih
-            ? ($mejaTersedia->firstWhere('id_meja', (int) $mejaDipilih)->nomor_meja ?? null)
-            : null;
+        // Meja tidak dipilih lagi oleh pelanggan: dipakai otomatis dari sesi
+        // check-in QR yang masih aktif (bila ada).
+        $mejaAktif = self::nomorMejaAktif($member) ?? $this->nomorMejaSesi($request);
+
+        // Meja dari scan QR / PIN kasir / reservasi aktif bersifat terkunci:
+        // pelanggan tidak boleh memilih meja lain lagi.
+        $mejaScan = $this->mejaDariScan($request, $member);
+        $idMejaMilik = $mejaScan?->id_meja ?? session('checkout_meja');
 
         return view('pelanggan.keranjang', [
             'keranjang' => $items,
             'totalKeranjang' => $ring['total'],
             'ringkasan' => $ring,
             'rekomendasi' => $rekomendasi,
-            'mejaTersedia' => $mejaTersedia,
+            'mejaAktif' => $mejaAktif,
+            'mejaScan' => $mejaScan,
+            'mejaTersedia' => $mejaScan ? collect() : $this->daftarMeja($idMejaMilik),
+            'idMejaTerpilih' => $idMejaMilik,
             'tipeDipilih' => session('checkout_tipe', 'dine-in'),
-            'mejaDipilih' => $mejaDipilih,
-            'mejaDipilihNomor' => $mejaDipilihNomor,
             'member' => $member,
         ]);
     }
@@ -417,21 +430,104 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'tipe_pesanan' => ['required', 'in:dine-in,takeaway'],
-            'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja', 'required_if:tipe_pesanan,dine-in'],
-        ], [
-            'id_meja.required_if' => 'Nomor meja wajib dipilih untuk pesanan dine-in.',
+            'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja'],
         ]);
 
         session([
             'checkout_tipe' => $validated['tipe_pesanan'],
-            'checkout_meja' => $validated['id_meja'] ?? null,
         ]);
+
+        // Meja sudah terkunci dari scan QR/PIN: abaikan pilihan meja lain.
+        $member = $request->user()
+            ? Pelanggan::where('nomor_telepon', $request->user()->nomor_telepon)->first()
+            : null;
+
+        if ($this->mejaDariScan($request, $member)) {
+            session()->forget('checkout_meja');
+
+            return redirect()->route('pelanggan.checkout');
+        }
+
+        // Meja yang dipilih pelanggan disimpan agar terbawa ke checkout.
+        if (! empty($validated['id_meja'])) {
+            session(['checkout_meja' => (int) $validated['id_meja']]);
+        } else {
+            session()->forget('checkout_meja');
+        }
 
         return redirect()->route('pelanggan.checkout');
     }
 
+    /**
+     * Meja yang sudah terikat ke sesi ini lewat scan QR, PIN kasir, atau
+     * reservasi aktif. Bila ada, pemilihan meja dikunci ke meja tersebut.
+     */
+    private function mejaDariScan(Request $request, ?Pelanggan $member): ?Meja
+    {
+        $id = $member ? self::idMejaAktif($member) : null;
+
+        if (! $id) {
+            $id = $this->idMejaSesi($request);
+        }
+
+        return $id ? Meja::find($id) : null;
+    }
+
+    /**
+     * Meja yang boleh muncul di pemilih: hanya yang kosong, ditambah meja
+     * milik sesi ini (kalau sudah terisi karena pesanan sendiri).
+     */
+    private function daftarMeja(?int $idMejaMilik = null)
+    {
+        return Meja::orderBy('nomor_meja')
+            ->where(function ($q) use ($idMejaMilik) {
+                $q->where('status', 'kosong');
+
+                if ($idMejaMilik) {
+                    $q->orWhere('id_meja', $idMejaMilik);
+                }
+            })
+            ->get(['id_meja', 'nomor_meja', 'kapasitas', 'status']);
+    }
+
+    /**
+     * Apakah meja boleh dipakai pelanggan ini? Meja kosong selalu boleh;
+     * meja terisi hanya boleh bila memang milik sesi/akun ini.
+     */
+    private function mejaBolehDipakai(Request $request, ?Pelanggan $pelanggan, Meja $meja): bool
+    {
+        if ($meja->status === 'kosong') {
+            return true;
+        }
+
+        // Meja dari QR/kode kasir yang terverifikasi di perangkat ini.
+        if ((int) $this->idMejaSesi($request) === (int) $meja->id_meja) {
+            return true;
+        }
+
+        if (! $pelanggan) {
+            // Tamu: boleh lanjut hanya bila sudah punya pesanan aktif di meja itu.
+            $milikTamu = array_map('intval', (array) $request->session()->get('tamu_pesanan', []));
+
+            return $milikTamu !== [] && Pesanan::whereIn('id_pesanan', $milikTamu)
+                ->where('id_meja', $meja->id_meja)
+                ->whereIn('status_pesanan', ['baru', 'diproses'])
+                ->exists();
+        }
+
+        // Member: reservasi aktif atau pesanan aktifnya di meja tersebut.
+        return ReservasiMeja::aktif()
+            ->where('id_meja', $meja->id_meja)
+            ->where('id_pelanggan', $pelanggan->id_pelanggan)
+            ->exists()
+            || Pesanan::where('id_meja', $meja->id_meja)
+                ->where('id_pelanggan', $pelanggan->id_pelanggan)
+                ->whereIn('status_pesanan', ['baru', 'diproses'])
+                ->exists();
+    }
+
     /** Halaman checkout: konfirmasi tipe/meja + ringkasan akhir. */
-    public function checkout()
+    public function checkout(Request $request)
     {
         $items = $this->items();
 
@@ -439,16 +535,27 @@ class CartController extends Controller
             return redirect()->route('pelanggan.menu')->with('error', 'Keranjang masih kosong.');
         }
 
-        $pengguna = auth()->user();
+        $pengguna = $request->user();
         $member = $pengguna
             ? Pelanggan::where('nomor_telepon', $pengguna->nomor_telepon)->first()
             : null;
 
+        // Meja dari scan QR / PIN kasir / reservasi aktif tidak bisa diganti.
+        $mejaScan = $this->mejaDariScan($request, $member);
+
         return view('pelanggan.checkout', [
             'keranjang' => $items,
+            'mejaScan' => $mejaScan,
+            // QRIS bisa dipakai pelanggan sendiri bila Midtrans sudah dikonfigurasi.
+            'qrisAktif' => $this->midtrans->isConfigured(),
+            'metodeAwal' => old('metode', $this->midtrans->isConfigured() ? 'qris' : 'tunai'),
             'totalKeranjang' => self::ringkasan($items, session('voucher_kode'), (bool) session('tukar_poin'), $member)['total'],
             'ringkasan' => self::ringkasan($items, session('voucher_kode'), (bool) session('tukar_poin'), $member),
-            'mejaTersedia' => DB::table('meja')->orderBy('nomor_meja')->get(),
+            'mejaAktif' => self::nomorMejaAktif($member) ?? $this->nomorMejaSesi($request),
+            'mejaTersedia' => $mejaScan
+                ? collect()
+                : $this->daftarMeja(session('checkout_meja')),
+            'idMejaTerpilih' => $mejaScan?->id_meja ?? session('checkout_meja'),
         ]);
     }
 
@@ -461,34 +568,94 @@ class CartController extends Controller
             return redirect()->route('pelanggan.menu')->with('error', 'Keranjang masih kosong.');
         }
 
+        $pengguna = $request->user();
+        $tamu = $pengguna === null;
+
         $validated = $request->validate([
             'tipe_pesanan' => ['required', 'in:dine-in,takeaway'],
-            'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja', 'required_if:tipe_pesanan,dine-in'],
+            'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja'],
+            // qris = pelanggan memindai QR sendiri; tunai = dibayar di kasir.
+            'metode' => ['nullable', 'in:qris,tunai'],
             'catatan' => ['nullable', 'string', 'max:500'],
+            'nama_pemesan' => [$tamu ? 'required' : 'nullable', 'string', 'min:2', 'max:100'],
         ], [
-            'id_meja.required_if' => 'Nomor meja wajib dipilih untuk pesanan dine-in.',
+            'nama_pemesan.required' => 'Nama pemesan wajib diisi untuk pesanan tanpa akun.',
         ]);
 
-        $pengguna = $request->user();
+        $pelanggan = null;
 
-        // Akun lama tanpa no. HP tak punya member — arahkan lengkapi dulu
-        // agar order tidak menumpang baris member NULL milik orang lain.
-        if (! $pengguna->nomor_telepon) {
-            return redirect()->route('pelanggan.profil')
-                ->with('error', 'Lengkapi nomor HP di profil dulu agar pesanan & poin tercatat atas nama Anda.');
+        if ($pengguna) {
+            // Akun lama tanpa no. HP tak punya member — arahkan lengkapi dulu
+            // agar order tidak menumpang baris member NULL milik orang lain.
+            if (! $pengguna->nomor_telepon) {
+                return redirect()->route('pelanggan.profil')
+                    ->with('error', 'Lengkapi nomor HP di profil dulu agar pesanan & poin tercatat atas nama Anda.');
+            }
+
+            $pelanggan = Pelanggan::firstOrCreate(
+                ['nomor_telepon' => $pengguna->nomor_telepon],
+                ['nama_pelanggan' => $pengguna->nama_lengkap, 'poin_loyalitas' => 0],
+            );
+
+            // Nama member mengikuti nama akun, supaya struk/riwayat tidak
+            // menampilkan nama lama atau nama pemilik nomor sebelumnya.
+            if ($pelanggan->nama_pelanggan !== $pengguna->nama_lengkap) {
+                $pelanggan->update(['nama_pelanggan' => $pengguna->nama_lengkap]);
+            }
         }
 
-        // Pesanan atas nama akun pelanggan yang login (non-member tak dibutuhkan
-        // karena semua pelanggan wajib punya akun).
-        $pelanggan = Pelanggan::firstOrCreate(
-            ['nomor_telepon' => $pengguna->nomor_telepon],
-            ['nama_pelanggan' => $pengguna->nama_lengkap, 'poin_loyalitas' => 0],
-        );
+        // Pelanggan tidak memilih meja: pesanan dine-in memakai meja dari sesi
+        // check-in QR yang masih aktif. Tanpa sesi, pesanan ditolak dan
+        // pelanggan diarahkan memindai QR meja lebih dulu.
+        // Meja hanya relevan untuk dine-in. Takeaway tidak boleh menempel
+        // meja, kalau tidak meja ikut ditandai terisi padahal tidak dipakai.
+        $idMeja = null;
 
-        // Nama member mengikuti nama akun, supaya struk/riwayat tidak
-        // menampilkan nama lama atau nama pemilik nomor sebelumnya.
-        if ($pelanggan->nama_pelanggan !== $pengguna->nama_lengkap) {
-            $pelanggan->update(['nama_pelanggan' => $pengguna->nama_lengkap]);
+        // Meja yang sudah di-scan (QR, PIN kasir, atau reservasi) terkunci:
+        // pilihan meja lain dari form diabaikan demi keamanan.
+        $mejaScan = $this->mejaDariScan($request, $pelanggan);
+
+        // Kebijakan: makan di tempat wajib dimulai dari scan QR meja + PIN kasir.
+        if ($validated['tipe_pesanan'] === 'dine-in' && ! $mejaScan) {
+            return redirect()->route('pelanggan.meja.pindai')
+                ->with('error', 'Pesanan makan di tempat wajib diawali scan QR meja dan PIN dari kasir. Pindai QR di meja Anda, minta PIN, lalu ulangi checkout.');
+        }
+
+        if ($validated['tipe_pesanan'] === 'dine-in') {
+            // Urutan: meja hasil scan → pilihan di form → pilihan tersimpan.
+            $idMeja = $mejaScan?->id_meja ?? $validated['id_meja'] ?? session('checkout_meja');
+
+            if (! $idMeja) {
+                // Member: sesi check-in QR miliknya. Tamu: sesi kode meja dari kasir.
+                $idMeja = $pelanggan ? self::idMejaAktif($pelanggan) : $this->idMejaSesi($request);
+            }
+        }
+
+        if ($validated['tipe_pesanan'] === 'dine-in' && ! $idMeja) {
+            return redirect()->route('pelanggan.meja.pindai')
+                ->with('error', 'Pesanan makan di tempat wajib punya meja. Pindai QR meja dulu, lalu ulangi checkout.');
+        }
+
+        // Pay-first: maksimal satu pesanan yang belum dibayar per meja/sesi,
+        // supaya satu meja tidak menumpuk order fiktif yang tak pernah dibayar.
+        $belumDibayar = ($pelanggan || $idMeja) && Pesanan::where('status_pesanan', 'baru')
+            ->where('waktu_pesan', '>=', now()->subMinutes(15))
+            ->where(function ($q) use ($idMeja, $pelanggan) {
+                if ($pelanggan) {
+                    $q->where('id_pelanggan', $pelanggan->id_pelanggan);
+                    if ($idMeja) {
+                        $q->orWhere('id_meja', $idMeja);
+                    }
+                } else {
+                    $q->where('id_meja', $idMeja);
+                }
+            })
+            ->whereDoesntHave('transaksi', fn ($q) => $q->where('status_pembayaran', 'lunas'))
+            ->exists();
+
+        if ($belumDibayar) {
+            return redirect()->route('pelanggan.keranjang.index')
+                ->with('error', 'Masih ada pesanan yang belum dibayar. Selesaikan pembayaran atau tunggu 15 menit sampai dibatalkan otomatis.');
         }
 
         // Voucher + poin dari Step 02 (divalidasi ulang di OrderController).
@@ -505,8 +672,10 @@ class CartController extends Controller
         // Request baru harus membawa user resolver — jika tidak, OrderController
         // tidak bisa mengisi id_pengguna dan akan menolak pesanan.
         $innerRequest = new Request(array_merge($request->all(), [
-            'id_pelanggan' => $pelanggan->id_pelanggan,
-            'id_pengguna' => $pengguna->id_pengguna,
+            'id_pelanggan' => $pelanggan?->id_pelanggan,
+            'id_pengguna' => $pengguna?->id_pengguna,
+            'nama_pemesan' => $pelanggan ? null : ($validated['nama_pemesan'] ?? null),
+            'id_meja' => $idMeja,
             'id_promo' => isset($cek) && $cek ? $cek->id_promo : null,
             'tukar_poin' => (bool) session('tukar_poin'),
             'items' => array_map(fn ($i) => [
@@ -523,7 +692,24 @@ class CartController extends Controller
         // abort(422) dari store() melempar HttpException — tangkap agar user
         // kembali ke checkout dengan pesan ramah, bukan halaman error mentah.
         try {
-            $response = $orderController->store($innerRequest);
+            // Kunci meja di transaksi yang sama dengan pembuatan pesanan,
+            // supaya dua pelanggan tidak bisa memesan meja yang sama
+            // bersamaan (meja langsung berstatus terisi).
+            $response = DB::transaction(function () use ($request, $pelanggan, $idMeja, $innerRequest, $orderController) {
+                if ($idMeja) {
+                    $meja = Meja::lockForUpdate()->find($idMeja);
+
+                    if (! $meja) {
+                        abort(422, 'Meja tidak ditemukan. Pilih meja lain.');
+                    }
+
+                    if (! $this->mejaBolehDipakai($request, $pelanggan, $meja)) {
+                        abort(422, 'Meja '.$meja->nomor_meja.' sedang dipakai pelanggan lain. Pilih meja kosong atau pindai QR meja Anda.');
+                    }
+                }
+
+                return $orderController->store($innerRequest);
+            });
         } catch (HttpException $e) {
             return redirect()->route('pelanggan.checkout')->with('error', $e->getMessage());
         }
@@ -536,11 +722,148 @@ class CartController extends Controller
 
         $pesanan = $response->getData(true)['data'];
 
-        session()->forget(['keranjang', 'voucher_kode', 'tukar_poin']);
+        // Tamu tanpa akun: simpan id pesanan di sesi perangkat ini supaya
+        // halaman status/pembayaran bisa dibuka tanpa login.
+        if ($tamu) {
+            $milikTamu = (array) session('tamu_pesanan', []);
+            $milikTamu[] = (int) $pesanan['id_pesanan'];
+            session(['tamu_pesanan' => array_values(array_unique($milikTamu))]);
+        }
 
-        return redirect()
-            ->route('pelanggan.status', $pesanan['nomor_pesanan'])
-            ->with('success', 'Pesanan '.$pesanan['nomor_pesanan'].' berhasil dibuat!');
+        session()->forget(['keranjang', 'voucher_kode', 'tukar_poin', 'checkout_meja', 'checkout_tipe']);
+
+        $metode = $validated['metode'] ?? 'tunai';
+        $tujuan = route('pelanggan.status', $pesanan['nomor_pesanan']);
+
+        if ($metode === 'qris' && $this->midtrans->isConfigured()) {
+            // Halaman status langsung membuka panel QRIS.
+            $tujuan .= '?bayar=qris';
+        }
+
+        return redirect()->to($tujuan)->with(
+            'success',
+            $metode === 'qris' && $this->midtrans->isConfigured()
+                ? 'Pesanan '.$pesanan['nomor_pesanan'].' dibuat. Pindai kode QRIS untuk membayar.'
+                : 'Pesanan '.$pesanan['nomor_pesanan'].' dibuat. Silakan bayar tunai di kasir.'
+        );
+    }
+
+    /** Nomor meja dari sesi check-in QR aktif milik member (null bila belum). */
+    private static function nomorMejaAktif(?Pelanggan $member): ?string
+    {
+        if (! $member) {
+            return null;
+        }
+
+        return ReservasiMeja::aktif()
+            ->with('meja:id_meja,nomor_meja')
+            ->where('id_pelanggan', $member->id_pelanggan)
+            ->latest('id_reservasi')
+            ->first()?->meja?->nomor_meja;
+    }
+
+    /**
+     * Charge QRIS yang diprakarsai pelanggan sendiri (member maupun tamu)
+     * dari halaman status pesanan. Otorisasi memakai sesi pemilik pesanan,
+     * sama seperti halaman status.
+     */
+    public function bayarQris(Request $request, Pesanan $pesanan): JsonResponse
+    {
+        abort_unless($this->bolehLihat($request, $pesanan), 403, 'Bukan pesanan milik Anda.');
+
+        if ($pesanan->isTerminal()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pesanan sudah selesai atau dibatalkan.',
+            ], 422);
+        }
+
+        if ($pesanan->sudahLunas()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Pesanan ini sudah lunas.',
+            ], 422);
+        }
+
+        if (! $this->midtrans->isConfigured()) {
+            return response()->json([
+                'status' => 'error',
+                'code' => 'midtrans_not_configured',
+                'message' => 'Pembayaran QRIS belum aktif. Silakan bayar di kasir.',
+            ], 422);
+        }
+
+        // Pakai ulang QR yang masih berlaku supaya tidak menagih ganda.
+        if ($pending = $this->midtrans->pendingPayment($pesanan)) {
+            return response()->json([
+                'status' => 'success',
+                'reused' => true,
+                'payment' => $pending,
+            ]);
+        }
+
+        try {
+            $payment = $this->midtrans->chargeQris($pesanan);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'reused' => false,
+            'payment' => $payment,
+        ]);
+    }
+
+    /** Nomor meja dari sesi kode meja (akun ataupun tamu tanpa akun). */
+    private function nomorMejaSesi(Request $request): ?string
+    {
+        $idMeja = $this->idMejaSesi($request);
+
+        return $idMeja ? Meja::where('id_meja', $idMeja)->value('nomor_meja') : null;
+    }
+
+    /** id_meja dari sesi kode meja (akun ataupun tamu tanpa akun). */
+    private function idMejaSesi(Request $request): ?int
+    {
+        $pengguna = $request->user();
+
+        // 0 = tamu tanpa akun; member harus cocok dengan akun pemilik sesi.
+        return $this->kodeMeja->mejaTerverifikasi(
+            $request,
+            $pengguna ? (int) $pengguna->getKey() : 0,
+        );
+    }
+
+    /**
+     * Boleh melihat status pesanan: pemilik akun/member, atau tamu yang
+     * pesanannya tercatat di sesi perangkat ini.
+     */
+    private function bolehLihat(Request $request, Pesanan $pesanan): bool
+    {
+        if ($this->milikSendiri($request->user(), $pesanan)) {
+            return true;
+        }
+
+        $milikTamu = array_map('intval', (array) $request->session()->get('tamu_pesanan', []));
+
+        return in_array((int) $pesanan->id_pesanan, $milikTamu, true);
+    }
+
+    /** id_meja dari sesi check-in QR aktif milik member (null bila belum). */
+    private static function idMejaAktif(?Pelanggan $member): ?int
+    {
+        if (! $member) {
+            return null;
+        }
+
+        return ReservasiMeja::aktif()
+            ->where('id_pelanggan', $member->id_pelanggan)
+            ->latest('id_reservasi')
+            ->value('id_meja');
     }
 
     /**
@@ -549,7 +872,8 @@ class CartController extends Controller
      */
     public function batalKeranjang(Request $request)
     {
-        abort_unless($request->user()?->isPelanggan(), 403);
+        // Tamu tanpa akun juga boleh membatalkan keranjangnya sendiri —
+        // keranjang disimpan di sesi perangkat, bukan milik akun.
 
         session()->forget([
             'keranjang',
@@ -570,7 +894,7 @@ class CartController extends Controller
             ->where('nomor_pesanan', $nomorPesanan)
             ->firstOrFail();
 
-        abort_unless($this->milikSendiri($request->user(), $pesanan), 403, 'Bukan pesanan milik Anda.');
+        abort_unless($this->bolehLihat($request, $pesanan), 403, 'Bukan pesanan milik Anda.');
 
         return view('pelanggan.status', ['pesanan' => $pesanan]);
     }
@@ -581,9 +905,26 @@ class CartController extends Controller
      */
     public function statusLive(Request $request, Pesanan $pesanan): JsonResponse
     {
-        abort_unless($this->milikSendiri($request->user(), $pesanan), 403, 'Bukan pesanan milik Anda.');
+        abort_unless($this->bolehLihat($request, $pesanan), 403, 'Bukan pesanan milik Anda.');
 
         $pesanan->loadMissing('transaksi');
+
+        // Polling pelanggan boleh meminta sinkronisasi ke Midtrans agar
+        // pembayaran QRIS terdeteksi walau webhook tidak menjangkau server.
+        if ($request->boolean('sync')
+            && $pesanan->transaksi?->midtrans_order_id
+            && $pesanan->transaksi->status_pembayaran === 'menunggu'
+            && $this->midtrans->isConfigured()) {
+            try {
+                $this->midtrans->applyStatus(
+                    $pesanan,
+                    $this->midtrans->remoteStatus($pesanan->transaksi->midtrans_order_id),
+                );
+                $pesanan->refresh()->loadMissing('transaksi');
+            } catch (\Throwable) {
+                // Abaikan gangguan gateway; polling berikutnya mencoba lagi.
+            }
+        }
 
         return response()
             ->json([
@@ -602,11 +943,14 @@ class CartController extends Controller
     public function batalkan(Request $request, Pesanan $pesanan)
     {
         $pengguna = $request->user();
-        abort_unless($pengguna?->isPelanggan(), 403);
 
-        if (! $this->milikSendiri($pengguna, $pesanan)) {
-            abort(403, 'Bukan pesanan milik Anda.');
+        // Pelanggan login boleh membatalkan pesanan miliknya; tamu tanpa akun
+        // hanya pesanan yang tercatat pada sesi perangkatnya.
+        if ($pengguna && ! $pengguna->isPelanggan()) {
+            abort(403);
         }
+
+        abort_unless($this->bolehLihat($request, $pesanan), 403, 'Bukan pesanan milik Anda.');
 
         try {
             $pesanan->batalkan();
@@ -614,7 +958,8 @@ class CartController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('pelanggan.dashboard')
+        return redirect()
+            ->route($pengguna ? 'pelanggan.dashboard' : 'pelanggan.menu')
             ->with('success', 'Pesanan '.$pesanan->nomor_pesanan.' dibatalkan.');
     }
 
@@ -628,6 +973,79 @@ class CartController extends Controller
      * Kepemilikan order: cocok via pembuat (id_pengguna) ATAU via member.
      * Dua jalur agar order lama (sebelum no. HP wajib) tetap dikenali.
      */
+    /**
+     * Fitur "Pesan Lagi": salin item pesanan lama ke keranjang.
+     * Menu yang habis/dinonaktifkan dilewati, bukan menggagalkan semuanya.
+     */
+    public function pesanLagi(Request $request, string $nomorPesanan)
+    {
+        $pesanan = Pesanan::with('detailPesanan.produk')
+            ->where('nomor_pesanan', $nomorPesanan)
+            ->firstOrFail();
+
+        abort_unless($this->milikSendiri($request->user(), $pesanan), 403);
+
+        if ($pesanan->status_pesanan === 'dibatalkan') {
+            return redirect()->route('pelanggan.riwayat')
+                ->with('error', 'Pesanan yang dibatalkan tidak bisa dipesan ulang.');
+        }
+
+        $keranjang = session('keranjang', []);
+        $dilewati = [];
+        $ditambah = 0;
+
+        foreach ($pesanan->detailPesanan as $detail) {
+            $produk = $detail->produk;
+
+            if (! $produk || ! $produk->status_tersedia || $produk->stok <= 0) {
+                $dilewati[] = $produk->nama_produk ?? 'Salah satu menu';
+
+                continue;
+            }
+
+            $key = (string) $produk->id_produk;
+            if ($detail->catatan_item) {
+                $key .= '_'.substr(md5($detail->catatan_item), 0, 6);
+            }
+
+            $sudahAda = (int) ($keranjang[$key]['jumlah'] ?? 0);
+            if ($sudahAda + (int) $detail->jumlah > $produk->stok) {
+                $dilewati[] = $produk->nama_produk;
+
+                continue;
+            }
+
+            $keranjang[$key] = [
+                'key' => $key,
+                'id_produk' => $produk->id_produk,
+                'nama' => $produk->nama_produk,
+                'sku' => $produk->kode_produk,
+                'kategori' => $produk->kategori->nama_kategori ?? null,
+                'gambar' => $produk->url_gambar,
+                'harga' => (float) $produk->harga,
+                'jumlah' => $sudahAda + (int) $detail->jumlah,
+                'opsi' => null,
+                'opsi_text' => $detail->catatan_item,
+                'catatan' => $detail->catatan_item,
+            ];
+            $ditambah++;
+        }
+
+        session(['keranjang' => $keranjang]);
+
+        if ($ditambah === 0) {
+            return redirect()->route('pelanggan.riwayat')
+                ->with('error', 'Menu dari pesanan #'.$pesanan->nomor_pesanan.' sedang tidak tersedia.');
+        }
+
+        $pesan = $ditambah.' item dari #'.$pesanan->nomor_pesanan.' ditambahkan ke keranjang.';
+        if ($dilewati) {
+            $pesan .= ' Tidak tersedia: '.implode(', ', array_unique($dilewati)).'.';
+        }
+
+        return redirect()->route('pelanggan.keranjang.index')->with('success', $pesan);
+    }
+
     private function milikSendiri($pengguna, Pesanan $pesanan): bool
     {
         if (! $pengguna) {

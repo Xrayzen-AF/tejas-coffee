@@ -145,38 +145,6 @@ class KasirTableMidtransTest extends TestCase
         $this->assertSame(1, $fake->charges);
     }
 
-    public function test_transfer_va_memvalidasi_bank_dan_menyimpan_nomor_va(): void
-    {
-        MidtransSettings::create([
-            'server_key' => 'SB-Mid-server-test',
-            'client_key' => 'SB-Mid-client-test',
-            'is_production' => false,
-        ]);
-
-        $pesanan = Pesanan::factory()->create(['total_harga' => 25000]);
-        $fake = $this->fakeMidtrans([
-            'va_numbers' => [['bank' => 'bca', 'va_number' => '12345678901']],
-        ]);
-
-        $this->actingAs($this->kasir())
-            ->postJson(route('pesanan.midtrans.transfer', $pesanan->id_pesanan), ['bank' => 'bank-palsu'])
-            ->assertStatus(422);
-
-        $this->actingAs($this->kasir())
-            ->postJson(route('pesanan.midtrans.transfer', $pesanan->id_pesanan), ['bank' => 'bca'])
-            ->assertOk()
-            ->assertJsonPath('payment.va_number', '12345678901')
-            ->assertJsonPath('payment.bank', 'BCA');
-
-        $this->assertSame(1, $fake->charges);
-        $this->assertSame('bca', $fake->lastParams['bank_transfer']['bank']);
-        $this->assertDatabaseHas('transaksi', [
-            'id_pesanan' => $pesanan->id_pesanan,
-            'midtrans_payment_type' => 'bank_transfer',
-            'status_pembayaran' => 'menunggu',
-        ]);
-    }
-
     public function test_webhook_settlement_menandai_lunas_dan_memberi_poin(): void
     {
         MidtransSettings::create([

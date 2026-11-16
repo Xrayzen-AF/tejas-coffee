@@ -17,7 +17,6 @@ use Midtrans\Transaction;
 /**
  * Integrasi Midtrans Core API untuk pembayaran POS:
  * - QRIS  : charge `qris` -> gambar QR hosted Midtrans, dipindai pelanggan.
- * - VA    : charge `bank_transfer` / `echannel` -> nomor virtual account.
  *
  * Kredensial diambil dari tabel `midtrans_settings` (diatur admin) dan
  * fallback ke config/services.php + .env. Status pembayaran disinkronkan
@@ -35,6 +34,16 @@ class MidtransService
     ];
 
     public const EXPIRY_MINUTES = 15;
+
+    /**
+     * Acquirer QRIS yang terdaftar di Midtrans Core API. Satu QR dari
+     * acquirer mana pun tetap bisa dipindai GoPay, ShopeePay, OVO, DANA,
+     * LinkAja, maupun m-banking karena QRIS bersifat interoperabel.
+     */
+    public const QRIS_ACQUIRERS = [
+        'gopay' => 'GoPay',
+        'airpay shopee' => 'ShopeePay (AirPay Shopee)',
+    ];
 
     private ?array $credentials = null;
 
@@ -121,6 +130,13 @@ class MidtransService
             ],
         ], $this->customerParams($pesanan));
 
+        // Bila acquirer dipilih eksplisit (MIDTRANS_QRIS_ACQUIRER), kirim
+        // `qris.acquirer`. Bila kosong, Midtrans memakai acquirer default
+        // akun merchant — QRIS tetap bisa dibayar semua aplikasi QRIS.
+        if ($acquirer = $this->qrisAcquirer()) {
+            $params['qris'] = ['acquirer' => $acquirer];
+        }
+
         try {
             $raw = $this->sendCharge($params);
         } catch (\Throwable $e) {
@@ -132,63 +148,16 @@ class MidtransService
         return $this->persistPending($pesanan, $payment);
     }
 
-    /**
-     * Charge virtual account bank transfer (Mandiri memakai echannel).
-     */
-    public function chargeTransfer(Pesanan $pesanan, string $bank): array
+    /** Acquirer QRIS terpilih dari config; null = biarkan Midtrans memilih. */
+    public function qrisAcquirer(): ?string
     {
-        $this->ensureConfigured();
+        $acquirer = strtolower(trim((string) config('services.midtrans.qris_acquirer')));
 
-        $bank = strtolower(trim($bank));
-        if (! array_key_exists($bank, self::BANKS)) {
-            throw new \InvalidArgumentException('Bank virtual account tidak didukung.');
-        }
-
-        $this->configure();
-        $orderId = $this->newOrderId($pesanan);
-        $expiry = [
-            'custom_expiry' => [
-                'expiry_duration' => self::EXPIRY_MINUTES,
-                'unit' => 'minute',
-            ],
-        ];
-
-        if ($bank === 'mandiri') {
-            $params = array_merge([
-                'payment_type' => 'echannel',
-                'transaction_details' => [
-                    'order_id' => $orderId,
-                    'gross_amount' => $this->grossAmount($pesanan),
-                ],
-                'echannel' => [
-                    'bill_info1' => 'Pembayaran',
-                    'bill_info2' => 'Pesanan '.$pesanan->nomor_pesanan,
-                ],
-            ], $expiry, $this->customerParams($pesanan));
-        } else {
-            $params = array_merge([
-                'payment_type' => 'bank_transfer',
-                'transaction_details' => [
-                    'order_id' => $orderId,
-                    'gross_amount' => $this->grossAmount($pesanan),
-                ],
-                'bank_transfer' => ['bank' => $bank],
-            ], $expiry, $this->customerParams($pesanan));
-        }
-
-        try {
-            $raw = $this->sendCharge($params);
-        } catch (\Throwable $e) {
-            throw $this->chargeException($e);
-        }
-
-        $payment = $this->normalize($raw, 'transfer', $orderId, $bank);
-
-        return $this->persistPending($pesanan, $payment);
+        return array_key_exists($acquirer, self::QRIS_ACQUIRERS) ? $acquirer : null;
     }
 
     /**
-     * Bayar pending yang masih berlaku (QRIS/VA) agar tidak menagih ganda.
+     * Bayar pending QRIS yang masih berlaku agar tidak menagih ganda.
      */
     public function pendingPayment(Pesanan $pesanan): ?array
     {
@@ -223,6 +192,8 @@ class MidtransService
             'gross_amount' => (float) $trx->total_bayar,
             'qr_url' => $payload['qr_url'] ?? null,
             'qr_string' => $payload['qr_string'] ?? null,
+            'acquirer' => $payload['acquirer'] ?? null,
+            'issuer' => $payload['issuer'] ?? null,
             'va_number' => $payload['va_number'] ?? null,
             'biller_code' => $payload['biller_code'] ?? null,
             'bill_key' => $payload['bill_key'] ?? null,
@@ -298,6 +269,10 @@ class MidtransService
                 'gross_amount' => $grossAmount,
                 'va_number' => $va,
                 'bank' => $bank ? strtoupper((string) $bank) : null,
+                // `issuer` = aplikasi yang benar-benar membayar QRIS
+                // (gopay, shopeepay, ovo, dana, linkaja, atau kode bank).
+                'acquirer' => $raw['acquirer'] ?? ($payload['acquirer'] ?? null),
+                'issuer' => $raw['issuer'] ?? ($payload['issuer'] ?? null),
             ]);
 
             $data = [
@@ -314,7 +289,7 @@ class MidtransService
                     'subtotal' => (float) $pesanan->total_harga,
                     'total_bayar' => $grossAmount,
                     'kembalian' => 0,
-                    'bank_atau_ewallet' => $this->paymentLabel($paymentType, $bank),
+                    'bank_atau_ewallet' => $this->paymentLabel($paymentType, $bank, $raw['issuer'] ?? null),
                     'nomor_referensi' => $va ?: $transactionId,
                     'status_pembayaran' => 'lunas',
                     'waktu_pembayaran' => now(),
@@ -328,7 +303,7 @@ class MidtransService
                 $data += [
                     'status_pembayaran' => 'menunggu',
                     'nomor_referensi' => $trx?->nomor_referensi ?? $va ?? $transactionId,
-                    'bank_atau_ewallet' => $this->paymentLabel($paymentType, $bank),
+                    'bank_atau_ewallet' => $this->paymentLabel($paymentType, $bank, $raw['issuer'] ?? null),
                 ];
             }
 
@@ -423,10 +398,18 @@ class MidtransService
     {
         $raw = $this->toArray($raw);
 
+        // Utamakan QR format ASPI (`generate-qr-code-v2`) agar bisa dipindai
+        // semua aplikasi QRIS; fallback ke `generate-qr-code` versi lama.
         $qrUrl = null;
-        foreach ($raw['actions'] ?? [] as $action) {
-            if (($action['name'] ?? null) === 'generate-qr-code') {
-                $qrUrl = $action['url'] ?? null;
+        foreach (['generate-qr-code-v2', 'generate-qr-code'] as $nama) {
+            foreach ($raw['actions'] ?? [] as $action) {
+                if (($action['name'] ?? null) === $nama && ! empty($action['url'])) {
+                    $qrUrl = $action['url'];
+                    break;
+                }
+            }
+            if ($qrUrl) {
+                break;
             }
         }
 
@@ -446,6 +429,8 @@ class MidtransService
             'va_number' => $va,
             'biller_code' => $raw['biller_code'] ?? null,
             'bill_key' => $raw['bill_key'] ?? null,
+            'acquirer' => $raw['acquirer'] ?? null,
+            'issuer' => $raw['issuer'] ?? null,
             'expires_at' => $this->parseExpiry($raw['expiry_time'] ?? null),
         ];
     }
@@ -502,15 +487,30 @@ class MidtransService
             );
     }
 
-    private function paymentLabel(?string $paymentType, ?string $bank): string
+    private function paymentLabel(?string $paymentType, ?string $bank, ?string $issuer = null): string
     {
         if ($paymentType === 'qris') {
-            return 'QRIS (Midtrans)';
+            $wallet = $this->issuerLabel($issuer);
+
+            return $wallet ? 'QRIS · '.$wallet : 'QRIS (Midtrans)';
         }
 
         $bank = $bank ? strtoupper($bank) : 'BANK';
 
         return 'VA '.$bank.' (Midtrans)';
+    }
+
+    /** Nama aplikasi e-wallet penerbit QRIS yang dikenali laporan Midtrans. */
+    private function issuerLabel(?string $issuer): ?string
+    {
+        return match (strtolower(trim((string) $issuer))) {
+            'gopay' => 'GoPay',
+            'shopeepay' => 'ShopeePay',
+            'ovo' => 'OVO',
+            'dana' => 'DANA',
+            'linkaja' => 'LinkAja',
+            default => null,
+        };
     }
 
     private function parseExpiry(?string $value): ?string

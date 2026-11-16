@@ -50,6 +50,9 @@ class MasterMejaController extends Controller
             'qr' => $meja->mapWithKeys(fn (Meja $m) => [
                 $m->id_meja => $writer->writeString($mejaQr->urlScan($m)),
             ]),
+            'urlScan' => $meja->mapWithKeys(fn (Meja $m) => [
+                $m->id_meja => $mejaQr->urlScan($m),
+            ]),
             'activeMenu' => 'meja',
         ]);
     }

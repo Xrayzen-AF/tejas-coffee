@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Meja;
+use App\Services\MejaKodeService;
 use App\Services\MejaQrService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -15,7 +18,10 @@ use Illuminate\View\View;
  */
 class MejaQrController extends Controller
 {
-    public function __construct(private readonly MejaQrService $mejaQr) {}
+    public function __construct(
+        private readonly MejaQrService $mejaQr,
+        private readonly MejaKodeService $mejaKode,
+    ) {}
 
     /**
      * Pemindai QR di dalam aplikasi: kamera membaca QR fisik di meja,
@@ -40,6 +46,10 @@ class MejaQrController extends Controller
             // Sesi tamu yang lolos verifikasi kode (bukan lewat akun login).
             'terverifikasi' => $state['kode'] === MejaQrService::KODE_MILIK_SENDIRI
                 && ! $request->user(),
+            // Sisa masa berlaku bukti kehadiran via kode kasir (null bila belum).
+            'kodeKasirDetik' => $request->user()
+                ? $this->mejaKode->sisaSesi($request, (int) $request->user()->getKey())
+                : null,
         ]);
     }
 
@@ -62,6 +72,69 @@ class MejaQrController extends Controller
         return redirect()
             ->route('meja.scan', ['meja' => $meja->qr_token])
             ->with('success', "Kode booking cocok. Meja {$meja->nomor_meja} tercatat atas nama Anda.");
+    }
+
+    /**
+     * Verifikasi kode sekali pakai yang diterbitkan kasir/barista.
+     * Jalur ini menggantikan verifikasi GPS bagi tamu yang sudah di meja.
+     */
+    public function verifikasiKode(Request $request, Meja $meja): RedirectResponse
+    {
+        $validated = $request->validate([
+            'kode_meja' => ['required', 'string', 'max:6'],
+        ], [
+            'kode_meja.required' => 'Kode dari kasir wajib diisi.',
+        ]);
+
+        $this->mejaKode->verifikasi($meja, $validated['kode_meja']);
+        $this->mejaKode->simpanSesi($request, $meja, $request->user());
+        // PIN sudah terpakai: jangan tampilkan lagi di layar pelanggan.
+        $this->mejaKode->lupakanPengiriman($meja, $request);
+
+        return redirect()
+            ->route('meja.scan', ['meja' => $meja->qr_token])
+            ->with('success', "Kode cocok. Kehadiran Anda di meja {$meja->nomor_meja} sudah terverifikasi.");
+    }
+
+    /**
+     * Pelanggan menekan "Minta PIN ke kasir". Permintaan masuk ke layar kasir; PIN
+     * akan dikirim balik ke halaman ini begitu kasir menerbitkannya.
+     */
+    public function mintaPin(Request $request, Meja $meja): JsonResponse
+    {
+        try {
+            $hasil = $this->mejaKode->minta($meja, $request);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->validator->errors()->first('pin'),
+            ], 429);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'kedaluwarsa_detik' => $hasil['kedaluwarsa_detik'],
+            'message' => 'Permintaan PIN terkirim ke kasir. PIN akan muncul otomatis di halaman ini.',
+        ]);
+    }
+
+    /** Polling pelanggan: apakah kasir sudah mengirim PIN untuk meja ini? */
+    public function pinStatus(Request $request, Meja $meja): JsonResponse
+    {
+        if ($pin = $this->mejaKode->pinTerkirim($meja, $request)) {
+            return response()->json([
+                'status' => 'siap',
+                'kode' => $pin['kode'],
+                'sisa_detik' => $pin['sisa_detik'],
+            ])->header('Cache-Control', 'no-store, max-age=0');
+        }
+
+        $permintaan = $this->mejaKode->permintaanAktif($meja);
+
+        return response()->json([
+            'status' => $permintaan ? 'menunggu' : 'tidak_ada',
+            'umur_detik' => $permintaan['umur_detik'] ?? null,
+        ])->header('Cache-Control', 'no-store, max-age=0');
     }
 
     public function checkin(Request $request, Meja $meja): RedirectResponse

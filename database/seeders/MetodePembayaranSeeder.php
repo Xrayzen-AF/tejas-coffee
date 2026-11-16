@@ -12,7 +12,6 @@ class MetodePembayaranSeeder extends Seeder
         $defaultMethods = [
             ['kode_metode' => 'CASH', 'nama_metode' => 'Tunai', 'ada_kembalian' => true],
             ['kode_metode' => 'QRIS', 'nama_metode' => 'QRIS / Midtrans', 'ada_kembalian' => false],
-            ['kode_metode' => 'TRANSFER', 'nama_metode' => 'Transfer Bank', 'ada_kembalian' => false],
         ];
 
         foreach ($defaultMethods as $method) {

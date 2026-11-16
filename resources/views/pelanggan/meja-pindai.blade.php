@@ -43,6 +43,12 @@
         tidak. Kalau meja sedang dipesan orang lain, aplikasi menawarkan meja kosong lain.
     </p>
 
+    @if (session('error'))
+        <div class="pindai-status is-err" style="margin-bottom:16px;">
+            <strong>{{ session('error') }}</strong>
+        </div>
+    @endif
+
     <div class="pindai-stage">
         <video id="qrVideo" playsinline muted aria-label="Pratinjau kamera untuk scan QR meja"></video>
         <div class="pindai-frame" aria-hidden="true"></div>

@@ -51,6 +51,7 @@ class Pesanan extends Model
         'nomor_pesanan',
         'id_pengguna',
         'id_pelanggan',
+        'nama_pemesan',
         'id_meja',
         'id_promo',
         'tipe_pesanan',
@@ -115,6 +116,22 @@ class Pesanan extends Model
         } while (self::where('nomor_pesanan', $number)->exists());
 
         return $number;
+    }
+
+    /**
+     * Label status berjenjang yang dibaca staf & pelanggan:
+     * Menunggu Pembayaran → Dibayar → Sedang Dibuat → Selesai.
+     * Status internal tetap baru/diproses/selesai agar state machine aman.
+     */
+    public function labelStatus(): string
+    {
+        return match ($this->status_pesanan) {
+            'baru' => $this->sudahLunas() ? 'Dibayar' : 'Menunggu Pembayaran',
+            'diproses' => 'Sedang Dibuat',
+            'selesai' => 'Selesai',
+            'dibatalkan' => 'Dibatalkan',
+            default => ucfirst($this->status_pesanan),
+        };
     }
 
     /** Cek apakah pindah status diizinkan oleh state machine. */

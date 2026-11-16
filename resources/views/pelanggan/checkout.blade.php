@@ -39,7 +39,7 @@
         <div class="mt-2 flex items-start justify-between gap-3">
             <div>
                 <h1 class="grotesk text-xl font-bold text-[#F1DFD8]">Konfirmasi Pesanan</h1>
-                <p class="mt-0.5 text-[13px] text-[#B8A8A1]">Periksa pesanan lalu bayar di kasir.</p>
+                <p class="mt-0.5 text-[13px] text-[#B8A8A1]">Periksa pesanan lalu pilih cara bayar.</p>
             </div>
             <span class="flex shrink-0 items-center gap-1.5 rounded bg-[#2F231D] px-2 py-1 text-[11px] font-semibold text-[#B8A8A1]">
                 <i data-lucide="lock" class="h-3.5 w-3.5"></i> Pembayaran Aman
@@ -66,29 +66,55 @@
                 <h2 class="text-sm font-bold tracking-wide text-[#F1DFD8]">Jenis Pesanan</h2>
                 <div class="mt-3 grid grid-cols-2 gap-2">
                     <label class="tipe relative">
-                        <input type="radio" name="tipe_pesanan" value="dine-in" {{ $tipeAwal === 'dine-in' ? 'checked' : '' }} onchange="document.getElementById('meja-box').classList.remove('hidden')">
+                        <input type="radio" name="tipe_pesanan" value="dine-in" {{ $tipeAwal === 'dine-in' ? 'checked' : '' }}>
                         <span class="box">
                             <span class="block text-sm font-bold text-[#F1DFD8]">Makan di Tempat</span>
-                            <span class="mt-0.5 block text-[11px] text-[#B8A8A1]">5–8 Menit</span>
+                            <span class="mt-0.5 block text-[11px] text-[#B8A8A1]">{{ $mejaAktif ? 'Meja ' . $mejaAktif : 'Pindai QR meja saat tiba' }}</span>
                         </span>
                     </label>
                     <label class="tipe relative">
-                        <input type="radio" name="tipe_pesanan" value="takeaway" {{ $tipeAwal === 'takeaway' ? 'checked' : '' }} onchange="document.getElementById('meja-box').classList.add('hidden')">
+                        <input type="radio" name="tipe_pesanan" value="takeaway" {{ $tipeAwal === 'takeaway' ? 'checked' : '' }}>
                         <span class="box">
                             <span class="block text-sm font-bold text-[#F1DFD8]">Bawa Pulang</span>
                             <span class="mt-0.5 block text-[11px] text-[#B8A8A1]">Ambil di kasir</span>
                         </span>
                     </label>
                 </div>
-                <div id="meja-box" class="mt-2 {{ $tipeAwal === 'dine-in' ? '' : 'hidden' }}">
-                    <label for="checkout-meja-trigger" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Nomor Meja</label>
-                    @include('pelanggan._pemilih-meja', [
-                        'mpId' => 'checkout-meja',
-                        'mejaTersedia' => $mejaTersedia,
-                        'terpilih' => old('id_meja', session('checkout_meja')),
-                    ])
+                <div class="mt-3">
+                    <label class="block text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Meja (untuk makan di tempat)</label>
+                    @if (! empty($mejaScan))
+                        @include('pelanggan._pemilih-meja', [
+                            'mejaTersedia' => $mejaTersedia ?? [],
+                            'terpilih' => $idMejaTerpilih ?? null,
+                        ])
+                    @else
+                        <div class="mt-1.5 rounded-lg border border-[#6B4A1F] bg-[#D97706]/10 p-3 text-[11.5px] leading-relaxed text-[#F6C89A]">
+                            Meja belum terverifikasi. Pesanan makan di tempat wajib diawali
+                            <a href="{{ route('pelanggan.meja.pindai') }}" class="font-bold underline">pindai QR meja</a>
+                            lalu masukkan <b>PIN dari kasir</b>. Belum punya PIN? Minta lewat tombol di halaman meja.
+                        </div>
+                    @endif
+                    <p class="mt-1.5 text-[11px] leading-snug text-[#9D8E87]">
+                        {{ ! empty($mejaScan)
+                            ? 'Meja terkunci dari scan QR — pesanan makan di tempat otomatis memakai meja ini.'
+                            : 'Meja belum terverifikasi — wajib pindai QR meja lalu masukkan PIN dari kasir.' }}
+                    </p>
                 </div>
             </section>
+
+            @guest
+                {{-- Tamu tanpa akun wajib mengisi nama agar pesanan tetap atas nama jelas. --}}
+                <section class="co-card mt-4 p-4 sm:p-5">
+                    <h2 class="text-sm font-bold tracking-wide text-[#F1DFD8]">Nama Pemesan</h2>
+                    <p class="mt-1 text-[11px] leading-snug text-[#B8A8A1]">Kamu memesan tanpa akun. Nama ini dipakai barista saat memanggil pesanan.</p>
+                    <input type="text" name="nama_pemesan" id="nama_pemesan" required minlength="2" maxlength="100"
+                           value="{{ old('nama_pemesan') }}" placeholder="cth: Budi" autocomplete="name"
+                           class="co-input mt-2">
+                    @error('nama_pemesan')
+                        <p class="mt-1 text-[11px] text-[#F87171]">{{ $message }}</p>
+                    @enderror
+                </section>
+            @endguest
 
             {{-- Daftar item --}}
             <section class="co-card mt-4 p-4 sm:p-5">
@@ -125,19 +151,40 @@
 
             {{-- Metode pembayaran --}}
             <section class="co-card mt-4 p-4 sm:p-5">
+                @php
+                    $qrisAktif = $qrisAktif ?? false;
+                    $metodeAwal = $metodeAwal ?? 'tunai';
+                @endphp
                 <div class="flex items-center justify-between">
                     <h2 class="text-sm font-bold tracking-wide text-[#F1DFD8]">Metode Pembayaran</h2>
-                    <span class="text-[11px] text-[#B8A8A1]">Pembayaran dilakukan di kasir</span>
+                    <span class="text-[11px] text-[#B8A8A1]">Pilih satu</span>
                 </div>
                 <div class="pay mt-3 space-y-2">
-                    <label title="Bayar di kasir">
-                        <input type="radio" name="metode" value="tunai" checked>
+                    <label title="Bayar sendiri lewat QRIS" class="{{ $qrisAktif ? '' : 'disabled' }}">
+                        <input type="radio" name="metode" value="qris"
+                               {{ $metodeAwal === 'qris' && $qrisAktif ? 'checked' : '' }}
+                               {{ $qrisAktif ? '' : 'disabled' }}>
                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#D97706] text-[#241708]">
+                            <i data-lucide="qr-code" class="h-4 w-4"></i>
+                        </span>
+                        <span class="flex-1">
+                            <span class="block text-sm font-semibold text-[#F1DFD8]">QRIS — Bayar dari HP</span>
+                            <span class="block text-[11px] text-[#B8A8A1]">
+                                {{ $qrisAktif
+                                    ? 'Kode QR muncul di halaman status setelah pesanan dibuat. Bisa GoPay, ShopeePay, DANA, OVO, atau m-banking.'
+                                    : 'QRIS belum aktif. Silakan bayar tunai di kasir.' }}
+                            </span>
+                        </span>
+                    </label>
+                    <label title="Bayar tunai di kasir">
+                        <input type="radio" name="metode" value="tunai"
+                               {{ $metodeAwal === 'tunai' || ! $qrisAktif ? 'checked' : '' }}>
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#2F231D] text-[#F6C89A]">
                             <i data-lucide="banknote" class="h-4 w-4"></i>
                         </span>
                         <span class="flex-1">
-                            <span class="block text-sm font-semibold text-[#F1DFD8]">Bayar di Kasir</span>
-                            <span class="block text-[11px] text-[#B8A8A1]">Tunjukkan nomor pesanan ke kasir</span>
+                            <span class="block text-sm font-semibold text-[#F1DFD8]">Tunai di Kasir</span>
+                            <span class="block text-[11px] text-[#B8A8B1]">Tunjukkan nomor pesanan ke kasir, lalu bayar di sana</span>
                         </span>
                     </label>
                 </div>
@@ -187,7 +234,7 @@
 
             <div class="mt-4 flex items-start gap-2.5 rounded-lg bg-[#2F231D] px-4 py-3">
                 <i data-lucide="zap" class="mt-0.5 h-4 w-4 shrink-0 text-[#F1DFD8]"></i>
-                <p class="text-xs leading-relaxed text-[#B8A8A1]">Pesanan diteruskan ke mesin KDS Barista secara otomatis segera setelah dibuat. Tunjukkan nomor tiket di kasir untuk membayar.</p>
+                <p class="text-xs leading-relaxed text-[#B8A8A1]">Pesanan diteruskan ke mesin KDS Barista secara otomatis segera setelah dibuat. <strong class="text-[#F1DFD8]">QRIS</strong> dibayar sendiri dari HP lewat kode QR di halaman status, <strong class="text-[#F1DFD8]">tunai</strong> dibayar di kasir.</p>
             </div>
 
             {{-- Footer sticky --}}
@@ -209,7 +256,7 @@
                             <i data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i> Memproses Pesanan...
                         </span>
                     </button>
-                    <p class="mt-1.5 text-center text-[11px] text-[#B8A8A1]">Bayar tunai di kasir setelah pesanan dibuat.</p>
+                    <p class="mt-1.5 text-center text-[11px] text-[#B8A8A1]">QRIS: kode muncul di halaman status · Tunai: bayar di kasir.</p>
                 </div>
             </div>
         </form>

@@ -291,9 +291,23 @@ class MejaQrService
             ->get();
     }
 
+    /**
+     * URL yang dicetak di QR meja. Harus bisa dibuka dari HP pelanggan,
+     * jadi memakai APP_PUBLIC_URL (mis. http://192.168.1.10:8000) bila diisi;
+     * jika tidak, memakai host request yang sedang membuka halaman admin.
+     */
     public function urlScan(Meja $meja): string
     {
-        return route('meja.scan', ['meja' => $meja->qr_token]);
+        $path = '/meja/'.$meja->qr_token;
+        $base = trim((string) config('app.public_url'));
+
+        if ($base === '') {
+            $base = app()->runningInConsole()
+                ? (string) config('app.url')
+                : request()->getSchemeAndHttpHost();
+        }
+
+        return rtrim($base, '/').$path;
     }
 
     private function pesananMilik(Pengguna $pengguna, ?Pelanggan $pelanggan, Pesanan $pesanan): bool

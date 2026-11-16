@@ -171,6 +171,17 @@
                    value="{{ old('radius_meter', $settings['radius_meter'] ?? 150) }}" class="form-input" required>
             <span class="form-hint">Contoh 150 m untuk area cafe + parkir.</span>
           </div>
+          <div class="form-group">
+            <label class="form-label">Akurasi GPS maksimal (meter)</label>
+            <input name="max_accuracy_meter" type="number" min="10" max="1000"
+                   value="{{ old('max_accuracy_meter', $settings['max_accuracy_meter'] ?? null) }}"
+                   class="form-input" placeholder="otomatis">
+            <span class="form-hint">
+              Kosongkan untuk otomatis (35% radius, dibatasi 25–60 m → saat ini
+              ±{{ (int) round(max(25, min(60, (float) ($settings['radius_meter'] ?? 150) * 0.35))) }} m).
+              Naikkan bila perangkat hanya mendapat lokasi berbasis WiFi (akurasi 50–200 m).
+            </span>
+          </div>
         </div>
 
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:4px 0 10px;">

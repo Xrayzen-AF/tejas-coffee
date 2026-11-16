@@ -43,7 +43,9 @@ class OrderController extends Controller
      * - ANTI-SPOOFING: bila pembuatnya pelanggan, kiriman `id_pengguna` /
      *   `id_pelanggan` / `nama_pelanggan` dari client DIABAIKAN — order selalu
      *   atas nama sendiri (poin korban tak bisa dipakai orang lain).
-     * - `id_meja` boleh NULL untuk takeaway/delivery.
+     * - `id_meja` boleh NULL untuk takeaway/delivery. Pesanan dine-in pelanggan
+     *   memakai meja dari sesi check-in QR (diisi CartController), bukan pilihan
+     *   manual di form — staf tetap boleh mengirim `id_meja` eksplisit.
      * - Setiap pesanan langsung dibuatkan baris `transaksi` berstatus
      *   `menunggu` (dilunasi kasir via tandaiLunas).
      */
@@ -53,8 +55,9 @@ class OrderController extends Controller
             'id_pengguna' => ['nullable', 'integer', 'exists:pengguna,id_pengguna'],
             'id_pelanggan' => ['nullable', 'integer', 'exists:pelanggan,id_pelanggan'],
             'nama_pelanggan' => ['nullable', 'string', 'max:255'],
+            'nama_pemesan' => ['nullable', 'string', 'min:2', 'max:100'],
             'nomor_telepon' => ['nullable', 'string', 'max:20'],
-            'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja', 'required_if:tipe_pesanan,dine-in'],
+            'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja'],
             'id_promo' => ['nullable', 'integer', 'exists:promo,id_promo'],
             'id_metode' => ['nullable', 'integer', 'exists:metode_pembayaran,id_metode'],
             'tipe_pesanan' => ['required', Rule::in(Pesanan::TIPE_PESANAN)],
@@ -66,6 +69,13 @@ class OrderController extends Controller
             'items.*.harga_satuan' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'items.*.catatan_item' => ['nullable', 'string', 'max:255'],
         ]);
+
+        // Dine-in tanpa meja tidak boleh dibuat. Meja hanya didapat dari
+        // check-in QR pelanggan (atau dipilih staf kasir), jadi ditolak awal
+        // dengan pesan yang mengarahkan ke pemindaian QR meja.
+        if ($validated['tipe_pesanan'] === 'dine-in' && empty($validated['id_meja'])) {
+            abort(422, 'Pesanan makan di tempat wajib punya meja. Pindai QR meja dulu, lalu ulangi checkout.');
+        }
 
         $pembuat = $request->user();
 
@@ -87,8 +97,10 @@ class OrderController extends Controller
 
         $idPengguna = $validated['id_pengguna'] ?? $request->user()?->id_pengguna;
 
-        if (! $idPengguna) {
-            abort(422, 'Pesanan wajib memiliki kasir yang menangani (id_pengguna).');
+        // Pesanan tamu (tanpa akun) boleh tanpa id_pengguna asalkan
+        // identitas pemesan tercatat pada nama_pemesan.
+        if (! $idPengguna && empty($validated['nama_pemesan'])) {
+            abort(422, 'Pesanan wajib memiliki kasir yang menangani (id_pengguna) atau nama pemesan tamu.');
         }
 
         $pesanan = DB::transaction(function () use ($validated, $idPengguna) {
@@ -128,6 +140,7 @@ class OrderController extends Controller
                 'nomor_pesanan' => Pesanan::generateNomorPesanan(),
                 'id_pengguna' => $idPengguna,
                 'id_pelanggan' => $idPelanggan,
+                'nama_pemesan' => $validated['nama_pemesan'] ?? null,
                 'id_meja' => $validated['id_meja'] ?? null,
                 'id_promo' => $validated['id_promo'] ?? null,
                 'tipe_pesanan' => $validated['tipe_pesanan'],
@@ -212,7 +225,7 @@ class OrderController extends Controller
                 'poin_dipakai' => $poinPakai,
             ]);
 
-            // Buat tagihan menunggu: dilunasi kasir (tunai/transfer).
+            // Buat tagihan menunggu: dilunasi kasir (tunai/QRIS).
             // subtotal = tagihan bersih, total_bayar = 0 sampai lunas.
             $idMetode = $validated['id_metode'] ?? MetodePembayaran::query()
                 ->where('kode_metode', 'CASH')
@@ -320,6 +333,9 @@ class OrderController extends Controller
                 'message' => 'Transisi '.$pesanan->status_pesanan.' → '.$tujuan.' tidak diizinkan.',
             ], 422);
         }
+
+        $pesanan->update(['status_pesanan' => $tujuan]);
+        Pesanan::sinkronMeja($pesanan->id_meja);
 
         return response()->json([
             'message' => 'Status pesanan diperbarui.',

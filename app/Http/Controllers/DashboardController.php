@@ -34,8 +34,11 @@ class DashboardController extends Controller
      */
     public function barista(Request $request)
     {
+        // PAY-FIRST: dapur hanya menerima pesanan yang sudah lunas, sehingga
+        // order fiktif / belum dibayar tidak pernah diproses barista.
         $antrian = Pesanan::with(['detailPesanan.produk', 'meja', 'pelanggan', 'transaksi'])
             ->whereIn('status_pesanan', ['baru', 'diproses'])
+            ->whereHas('transaksi', fn ($q) => $q->where('status_pembayaran', 'lunas'))
             ->oldest('waktu_pesan')
             ->get();
 
@@ -50,7 +53,8 @@ class DashboardController extends Controller
         // tidak tertinggal di papan.
         ReservasiMeja::bersihkanKedaluwarsa();
 
-        $meja = Meja::withCount(['pesanan' => fn ($q) => $q->whereIn('status_pesanan', ['baru', 'diproses'])])
+        $meja = Meja::withCount(['pesanan' => fn ($q) => $q->whereIn('status_pesanan', ['baru', 'diproses'])
+            ->whereHas('transaksi', fn ($t) => $t->where('status_pembayaran', 'lunas'))])
             ->with('reservasiAktif.pelanggan')
             ->orderBy('nomor_meja')
             ->get();
@@ -245,8 +249,8 @@ class DashboardController extends Controller
      */
     public function mejaStatusPelanggan(Request $request): JsonResponse
     {
-        abort_unless($request->user()?->isPelanggan(), 403);
-
+        // Dipakai juga oleh pemilih meja sebelum login; snapshot memang
+        // publik (tanpa detail pesanan/identitas pelanggan).
         return response()
             ->json($this->mejaSnapshot(false))
             ->header('Cache-Control', 'no-store, max-age=0');
@@ -396,7 +400,7 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'tipe_pesanan' => ['required', 'in:dine-in,takeaway'],
             'id_meja' => ['nullable', 'integer', 'exists:meja,id_meja', 'required_if:tipe_pesanan,dine-in'],
-            'metode' => ['nullable', 'in:cash,qris,transfer'],
+            'metode' => ['nullable', 'in:cash,qris'],
             'catatan' => ['nullable', 'string', 'max:500'],
             'nama_pelanggan' => ['nullable', 'string', 'max:255'],
             'nomor_telepon' => ['nullable', 'string', 'max:20'],
@@ -446,7 +450,7 @@ class DashboardController extends Controller
         session()->forget('kasir_ticket');
 
         $tujuan = ['ticket' => $pesanan['id_pesanan']];
-        if (in_array($metode, ['qris', 'transfer'], true)) {
+        if (in_array($metode, ['qris'], true)) {
             $tujuan['bayar'] = $metode;
         }
 
@@ -598,9 +602,9 @@ class DashboardController extends Controller
     }
 
     /**
-     * Lunasi tagihan pesanan (kasir only) — tunai / transfer.
+     * Lunasi tagihan pesanan (kasir only) — tunai / QRIS.
      * - Tunai: input uang diterima, kembalian dihitung otomatis.
-     * - Transfer: nominal pas, wajib nomor referensi.
+     * - QRIS: nominal pas, wajib nomor referensi.
      * - Member dapat 1 poin tiap Rp 10.000 bersih.
      * - TIDAK mengubah status pesanan (serah terima terpisah),
      *   agar pesanan bayar-di-depan tetap dimasak barista.
@@ -649,13 +653,13 @@ class DashboardController extends Controller
                     $referensi = $validated['nomor_referensi'] ?? null;
                     $bank = $validated['bank_atau_ewallet'] ?? null;
                 } else {
-                    // TRANSFER/QRIS: nominal pas, wajib bukti referensi.
+                    // QRIS manual: nominal pas, wajib bukti referensi.
                     $bayar = (float) ($validated['jumlah_bayar'] ?? $tagihan);
                     if (abs($bayar - $tagihan) > 0.01) {
-                        abort(422, 'Nominal transfer harus pas Rp '.number_format($tagihan, 0, ',', '.').'.');
+                        abort(422, 'Nominal pembayaran harus pas Rp '.number_format($tagihan, 0, ',', '.').'.');
                     }
                     if (empty($validated['nomor_referensi'])) {
-                        abort(422, 'Nomor referensi transfer wajib diisi.');
+                        abort(422, 'Nomor referensi pembayaran wajib diisi.');
                     }
                     $kembalian = 0;
                     $referensi = $validated['nomor_referensi'];

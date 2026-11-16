@@ -50,12 +50,22 @@
                         <div class="shrink-0 text-right">
                             <p class="grotesk text-[13px] font-bold text-[#F1DFD8]">Rp {{ number_format($p->total_harga, 0, ',', '.') }}</p>
                             <span class="mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase {{ $p->status_pesanan === 'selesai' ? 'bg-[#352A22] text-[#F1DFD8]' : ($p->status_pesanan === 'dibatalkan' ? 'bg-[#BA1A1A]/10 text-[#F87171]' : 'bg-[#D97706] text-[#241708]') }}">
-                                {{ $p->status_pesanan }}
+                                {{ $p->labelStatus() }}
                             </span>
                         </div>
                     </a>
 
-                    <div class="mt-2.5 flex items-center justify-end border-t border-dashed border-[#3D322E] pt-2.5">
+                    <div class="mt-2.5 flex items-center justify-end gap-2 border-t border-dashed border-[#3D322E] pt-2.5">
+                        @if ($p->status_pesanan !== 'dibatalkan')
+                            <form method="POST" action="{{ route('pelanggan.riwayat.pesan-lagi', $p->nomor_pesanan) }}">
+                                @csrf
+                                <button type="submit"
+                                        class="inline-flex items-center gap-1.5 rounded-md border border-[#D97706]/60 bg-[#D97706]/12 px-2.5 py-1.5 text-[11px] font-semibold text-[#F1DFD8] transition hover:bg-[#D97706]/25">
+                                    <i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>
+                                    Pesan lagi
+                                </button>
+                            </form>
+                        @endif
                         <a href="{{ route('struk.show', $p) }}" target="_blank" rel="noopener"
                            class="inline-flex items-center gap-1.5 rounded-md border border-[#3D322E] bg-[#2F231D] px-2.5 py-1.5 text-[11px] font-semibold text-[#F1DFD8] transition hover:border-[#554336] hover:bg-[#352A22]">
                             <i data-lucide="receipt-text" class="h-3.5 w-3.5"></i>

@@ -10,6 +10,8 @@
                 @endif
                 @if ($p->pelanggan)
                     • {{ $p->pelanggan->nama_pelanggan }}
+                @elseif ($p->nama_pemesan)
+                    • {{ $p->nama_pemesan }}
                 @endif
             </p>
         </div>

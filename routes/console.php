@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Schedule;
 // sesi kedaluwarsa ditutup dan mejanya dikosongkan tiap menit.
 Schedule::command('meja:bersihkan')->everyMinute()->withoutOverlapping();
 
+// Kebijakan bayar-di-muka: pesanan yang belum dibayar 15 menit dibatalkan
+// otomatis (stok & poin dikembalikan) agar dapur tidak memproses order fiktif.
+Schedule::command('pesanan:batalkan-belum-bayar')->everyMinute()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

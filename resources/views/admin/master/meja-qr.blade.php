@@ -44,7 +44,7 @@
         <h3>Meja {{ $m->nomor_meja }}</h3>
         <p>Kapasitas {{ $m->kapasitas }} orang</p>
         <div class="qr-img">{!! $qr[$m->id_meja] !!}</div>
-        <div class="qr-url">{{ route('pelanggan.meja.scan', ['meja' => $m->qr_token]) }}</div>
+        <div class="qr-url">{{ $urlScan[$m->id_meja] ?? '' }}</div>
       </div>
     @endforeach
   </div>

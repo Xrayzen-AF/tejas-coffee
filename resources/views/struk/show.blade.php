@@ -210,7 +210,7 @@
     };
     $pelayan = ($pesanan->pengguna?->peran ?? null) === 'pelanggan'
         ? 'Self Order'
-        : ($pesanan->pengguna?->nama_lengkap ?? '-');
+        : ($pesanan->pengguna?->nama_lengkap ?? ($pesanan->nama_pemesan ? 'Tamu' : '-'));
     $kembali = $trx ? (float) $trx->kembalian : 0;
 @endphp
 
@@ -260,7 +260,7 @@
             {{-- Pesanan dari akun pelanggan memakai nama akun pembeli; member
                  hanya cadangan untuk order walk-in/kasir tanpa akun. --}}
             <dt>Pelanggan</dt>
-            <dd>: {{ $pesanan->pengguna?->nama_lengkap ?? $pesanan->pelanggan?->nama_pelanggan ?? '-' }}</dd>
+            <dd>: {{ $pesanan->pengguna?->nama_lengkap ?? $pesanan->pelanggan?->nama_pelanggan ?? $pesanan->nama_pemesan ?? '-' }}</dd>
             <dt>Telepon</dt>
             <dd>: {{ $pesanan->pengguna?->nomor_telepon ?: ($pesanan->pelanggan?->nomor_telepon ?: '-') }}</dd>
         </dl>

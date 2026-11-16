@@ -4,7 +4,7 @@
 
 @php
     $user = auth()->user();
-    $nama = $user->nama_lengkap ?? 'Kawan';
+    $nama = $user?->nama_lengkap ?? 'Kawan';
     $namaDepan = explode(' ', trim($nama))[0] ?: 'Kawan';
     $ikonKategori = function ($nama) {
         $n = strtolower($nama);

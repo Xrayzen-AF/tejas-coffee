@@ -6,11 +6,10 @@ use App\Models\Pesanan;
 use App\Services\MidtransService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 /**
  * Pembayaran non-tunai via Midtrans Core API untuk POS kasir:
- * QRIS dinamis dan Virtual Account (transfer bank).
+ * QRIS dinamis saja (tanpa Virtual Account).
  */
 class MidtransPaymentController extends Controller
 {
@@ -36,41 +35,6 @@ class MidtransPaymentController extends Controller
 
         try {
             $payment = $this->midtrans->chargeQris($pesanan);
-        } catch (\Throwable $e) {
-            return $this->gatewayError($e);
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'reused' => false,
-            'payment' => $payment,
-        ]);
-    }
-
-    public function transfer(Request $request, Pesanan $pesanan): JsonResponse
-    {
-        $this->authorizeKasir($request);
-        $this->ensurePayable($pesanan);
-
-        $validated = $request->validate([
-            'bank' => ['required', 'string', Rule::in(array_keys(MidtransService::BANKS))],
-        ]);
-
-        if (! $this->midtrans->isConfigured()) {
-            return $this->notConfigured();
-        }
-
-        if ($pending = $this->midtrans->pendingPayment($pesanan)) {
-            return response()->json([
-                'status' => 'success',
-                'reused' => true,
-                'payment' => $pending,
-                'message' => 'Pembayaran sebelumnya masih aktif.',
-            ]);
-        }
-
-        try {
-            $payment = $this->midtrans->chargeTransfer($pesanan, $validated['bank']);
         } catch (\Throwable $e) {
             return $this->gatewayError($e);
         }

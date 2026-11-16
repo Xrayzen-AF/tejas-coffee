@@ -252,12 +252,36 @@
                             @else
                                 <span class="st-badge st-badge--wait">
                                     <i data-lucide="clock"></i>
-                                    Menunggu pembayaran di kasir
+                                    {{ request('bayar') === 'qris' ? 'Menunggu pembayaran QRIS' : 'Menunggu pembayaran di kasir' }}
                                 </span>
                             @endif
                         </div>
                     </div>
                 </div>
+
+                {{-- Pembayaran QRIS diprakarsai pelanggan (member maupun tamu) --}}
+                @if ($stBayar !== 'lunas' && ! $dibatalkan && $pesanan->status_pesanan !== 'selesai')
+                    <div id="qris-panel" class="st-card p-5"
+                         data-qris-url="{{ route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan) }}"
+                         data-status-url="{{ route('pelanggan.pesanan.status-live', $pesanan->id_pesanan) }}">
+                        <p class="st-eyebrow">Pembayaran</p>
+                        <p class="mt-1 text-[13px] leading-relaxed text-[#B8A8A1]">
+                            Bayar sekarang lewat QRIS — bisa dipindai GoPay, ShopeePay, DANA, OVO, LinkAja, atau m-banking.
+                        </p>
+                        <button type="button" id="qris-mulai" class="st-btn st-btn-primary mt-3">
+                            <i data-lucide="qr-code"></i>
+                            Tampilkan Kode QRIS
+                        </button>
+                        <div id="qris-hasil" class="mt-3 hidden text-center">
+                            <img id="qris-img" alt="QRIS pembayaran" width="232" height="232"
+                                 class="mx-auto hidden w-full max-w-[232px] rounded-lg bg-white p-2">
+                            <p id="qris-pesan" class="mt-2 text-[12px] font-semibold text-[#F1DFD8]"></p>
+                            <p class="mt-1 text-[10.5px] text-[#9D8E87]">Kode berlaku 15 menit. Halaman ini diperbarui otomatis setelah pembayaran.</p>
+                        </div>
+                        <p id="qris-galat" class="mt-2 text-[11px] leading-snug text-[#F87171]"></p>
+                        <p class="mt-2 text-[11px] text-[#9D8E87]">Belum bisa QRIS? Bayar tunai di kasir.</p>
+                    </div>
+                @endif
 
                 {{-- Banner siap diambil (muncul otomatis saat status berubah) --}}
                 <div id="siap-banner"
@@ -646,6 +670,103 @@
     } else if (statusSekarang !== 'dibatalkan') {
         setTimeout(poling, 5000);
     }
+})();
+</script>
+
+<script>
+/* ── QRIS diprakarsai pelanggan: tampilkan QR + polling sampai lunas ── */
+(function () {
+    var panel = document.getElementById('qris-panel');
+    if (!panel) return;
+
+    var tombol = document.getElementById('qris-mulai');
+    var hasil = document.getElementById('qris-hasil');
+    var img = document.getElementById('qris-img');
+    var pesan = document.getElementById('qris-pesan');
+    var galat = document.getElementById('qris-galat');
+    var qrUrl = panel.getAttribute('data-qris-url');
+    var statusUrl = panel.getAttribute('data-status-url');
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var timer = null;
+
+    function setPesan(teks) {
+        if (pesan) pesan.textContent = teks;
+    }
+
+    function mulaiPolling() {
+        if (timer) return;
+
+        timer = setInterval(function () {
+            fetch(statusUrl + '?sync=1', {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store',
+            })
+                .then(function (res) { return res.ok ? res.json() : null; })
+                .then(function (data) {
+                    if (!data) return;
+
+                    if (data.status_pembayaran === 'lunas') {
+                        clearInterval(timer);
+                        timer = null;
+                        setPesan('Pembayaran diterima. Terima kasih!');
+                        location.reload();
+                    } else if (data.status_pembayaran === 'gagal') {
+                        clearInterval(timer);
+                        timer = null;
+                        setPesan('Pembayaran gagal atau kedaluwarsa. Tampilkan QR baru.');
+                        tombol.removeAttribute('disabled');
+                    }
+                })
+                .catch(function () {
+                    // Jaringan bermasalah: coba lagi di interval berikutnya.
+                });
+        }, 4000);
+    }
+
+    function mulaiQris() {
+        tombol.setAttribute('disabled', 'disabled');
+        if (galat) galat.textContent = '';
+        setPesan('Membuat kode QR…');
+
+        fetch(qrUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfMeta ? csrfMeta.content : '',
+            },
+            cache: 'no-store',
+        })
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    return { ok: res.ok, data: data };
+                });
+            })
+            .then(function (res) {
+                var payment = res.data && res.data.payment;
+
+                if (!res.ok || !payment || !payment.qr_url) {
+                    throw new Error((res.data && res.data.message) || 'Gagal membuat kode QR.');
+                }
+
+                img.src = payment.qr_url;
+                img.classList.remove('hidden');
+                hasil.classList.remove('hidden');
+                setPesan('Menunggu pembayaran…');
+                mulaiPolling();
+            })
+            .catch(function (e) {
+                if (galat) galat.textContent = e.message;
+                setPesan('');
+                tombol.removeAttribute('disabled');
+            });
+    }
+
+    tombol.addEventListener('click', mulaiQris);
+
+    // Pelanggan memilih QRIS saat checkout: langsung tampilkan kodenya.
+    @if (request('bayar') === 'qris')
+    setTimeout(mulaiQris, 300);
+    @endif
 })();
 </script>
 @endpush

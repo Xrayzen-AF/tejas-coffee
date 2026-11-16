@@ -60,27 +60,40 @@
                     @csrf
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <label class="tipe relative">
-                            <input type="radio" name="tipe_pesanan" value="dine-in" {{ old('tipe_pesanan', $tipeDipilih) === 'dine-in' ? 'checked' : '' }} onchange="document.getElementById('meja-box').classList.remove('hidden')">
+                            <input type="radio" name="tipe_pesanan" value="dine-in" {{ old('tipe_pesanan', $tipeDipilih) === 'dine-in' ? 'checked' : '' }}>
                             <span class="box">
                                 <span class="block text-sm font-bold text-[#F1DFD8]">Makan di Tempat</span>
-                                <span class="mt-0.5 block text-[11px] text-[#B8A8A1]">{{ $mejaDipilihNomor ? 'Meja ' . $mejaDipilihNomor : 'Pilih meja' }}</span>
+                                <span class="mt-0.5 block text-[11px] text-[#B8A8A1]">{{ $mejaAktif ? 'Meja ' . $mejaAktif : 'Wajib pindai QR meja + PIN' }}</span>
                             </span>
                         </label>
                         <label class="tipe relative">
-                            <input type="radio" name="tipe_pesanan" value="takeaway" {{ old('tipe_pesanan', $tipeDipilih) === 'takeaway' ? 'checked' : '' }} onchange="document.getElementById('meja-box').classList.add('hidden')">
+                            <input type="radio" name="tipe_pesanan" value="takeaway" {{ old('tipe_pesanan', $tipeDipilih) === 'takeaway' ? 'checked' : '' }}>
                             <span class="box">
                                 <span class="block text-sm font-bold text-[#F1DFD8]">Bawa Pulang</span>
                                 <span class="mt-0.5 block text-[11px] text-[#B8A8A1]">Ambil di kasir</span>
                             </span>
                         </label>
                     </div>
-                    <div id="meja-box" class="mt-2 {{ old('tipe_pesanan', $tipeDipilih) === 'dine-in' ? '' : 'hidden' }}">
-                        <label for="id_meja-trigger" class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Nomor Meja</label>
-                        @include('pelanggan._pemilih-meja', [
-                            'mpId' => 'id_meja',
-                            'mejaTersedia' => $mejaTersedia,
-                            'terpilih' => old('id_meja', $mejaDipilih),
-                        ])
+                    {{-- Terkunci bila meja sudah didapat dari scan QR / PIN / reservasi. --}}
+                    <div class="mt-3">
+                        <label class="block text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Meja (untuk makan di tempat)</label>
+                        @if (! empty($mejaScan))
+                            @include('pelanggan._pemilih-meja', [
+                                'mejaTersedia' => $mejaTersedia ?? [],
+                                'terpilih' => $idMejaTerpilih ?? null,
+                            ])
+                        @else
+                            <div class="mt-1.5 rounded-lg border border-[#6B4A1F] bg-[#D97706]/10 p-3 text-[11px] leading-relaxed text-[#F6C89A]">
+                                Meja belum terverifikasi. Pesanan makan di tempat wajib diawali
+                                <a href="{{ route('pelanggan.meja.pindai') }}" class="font-bold underline">pindai QR meja</a>
+                                lalu masukkan <b>PIN dari kasir</b>.
+                            </div>
+                        @endif
+                        <p class="mt-1.5 text-[10.5px] leading-snug text-[#9D8E87]">
+                            {{ ! empty($mejaScan)
+                                ? 'Meja terkunci dari scan QR — pesanan otomatis memakai meja ini.'
+                                : 'Meja belum terverifikasi — wajib pindai QR meja lalu masukkan PIN dari kasir.' }}
+                        </p>
                     </div>
                 </form>
                 <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-[#3D322E] pt-3 text-[11px] text-[#B8A8A1]">
@@ -243,7 +256,7 @@
                 <div class="mt-3 flex items-end justify-between border-t border-[#3D322E] pt-3">
                     <div>
                         <p class="text-sm font-bold text-[#F1DFD8]">Total Pembayaran</p>
-                        <p class="text-[11px] text-[#B8A8A1]">{{ $jmlItem }} item • {{ $tipeDipilih === 'dine-in' ? 'Makan di Tempat' . ($mejaDipilih ? ' • Meja ' . $mejaDipilih : '') : 'Bawa Pulang' }}</p>
+                        <p class="text-[11px] text-[#B8A8A1]">{{ $jmlItem }} item • {{ $tipeDipilih === 'dine-in' ? 'Makan di Tempat' . ($mejaAktif ? ' • Meja ' . $mejaAktif : '') : 'Bawa Pulang' }}</p>
                     </div>
                     <p class="grotesk text-2xl font-bold text-[#F1DFD8]">{{ $rp($ringkasan['total']) }}</p>
                 </div>

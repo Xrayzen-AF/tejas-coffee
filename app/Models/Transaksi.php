@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Model tabel `transaksi` sesuai ERD (PK: id_transaksi).
  * CASH     : total_bayar = uang diterima, kembalian = total_bayar - subtotal.
- * TRANSFER : total_bayar = nominal transfer, kembalian = 0,
+ * QRIS/non-tunai : total_bayar = nominal pas, kembalian = 0,
  *            bank_atau_ewallet & nomor_referensi diisi.
  */
 class Transaksi extends Model

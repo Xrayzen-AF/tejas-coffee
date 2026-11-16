@@ -128,13 +128,14 @@ class PelangganTableStatusTest extends TestCase
         $this->assertStringNotContainsString('123456', $body);
     }
 
-    public function test_role_lain_tidak_boleh_mengakses_status_meja_pelanggan(): void
+    public function test_status_meja_terbuka_untuk_umum_tanpa_detail_pesanan(): void
     {
-        $kasir = $this->pengguna('kasir', 'kasir@example.test');
-
-        $this->actingAs($kasir)
-            ->getJson(route('pelanggan.meja.status'))
-            ->assertForbidden();
+        // Pemilih meja dipakai pelanggan sebelum login (hasil scan QR meja),
+        // jadi snapshot ini publik — tetapi tetap tanpa detail pesanan.
+        $this->getJson(route('pelanggan.meja.status'))
+            ->assertOk()
+            ->assertJsonStructure(['tables'])
+            ->assertJsonMissingPath('tables.0.orders.0.nomor_pesanan');
     }
 
     public function test_beranda_pelanggan_merender_panel_status_meja(): void

@@ -26,7 +26,7 @@ class CafeGeofence
     /** Interval watchdog di browser (detik). */
     public const WATCH_INTERVAL_SECONDS = 60;
 
-    /** @return array{enabled: bool, latitude: ?float, longitude: ?float, radius: int} */
+    /** @return array{enabled: bool, latitude: ?float, longitude: ?float, radius: int, max_accuracy: ?float} */
     public static function settings(): array
     {
         $s = SettingController::load();
@@ -36,6 +36,7 @@ class CafeGeofence
             'latitude' => self::toFloat($s['cafe_latitude'] ?? null),
             'longitude' => self::toFloat($s['cafe_longitude'] ?? null),
             'radius' => max(10, (int) ($s['radius_meter'] ?? 150)),
+            'max_accuracy' => self::toFloat($s['max_accuracy_meter'] ?? null),
         ];
     }
 
@@ -61,12 +62,20 @@ class CafeGeofence
 
     /**
      * Batas akurasi GPS yang diterima server (meter).
-     * Dihitung dari radius supaya pembacaan kasar tidak bisa dipakai
-     * untuk lolos dari radius kecil.
+     * Default dihitung dari radius supaya pembacaan kasar tidak bisa dipakai
+     * untuk lolos dari radius kecil. Admin bisa menimpanya lewat
+     * "Akurasi GPS maksimal" di pengaturan (mis. untuk perangkat tanpa GPS
+     * yang hanya mendapat lokasi berbasis WiFi).
      */
     public static function maxAccuracy(): float
     {
-        return round(max(25.0, min(60.0, (float) self::settings()['radius'] * 0.35)), 1);
+        $s = self::settings();
+
+        if ($s['max_accuracy'] !== null) {
+            return round(max(10.0, min(1000.0, $s['max_accuracy'])), 1);
+        }
+
+        return round(max(25.0, min(60.0, (float) $s['radius'] * 0.35)), 1);
     }
 
     /** Jarak dua koordinat dalam meter (haversine). */
@@ -82,6 +91,10 @@ class CafeGeofence
 
         $a = sin($dLat / 2) ** 2
             + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        // Clamp: galat pembulatan float bisa membuat $a sedikit > 1
+        // sehingga sqrt(1 - $a) menghasilkan NaN.
+        $a = min(1.0, max(0.0, $a));
 
         return $earth * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }

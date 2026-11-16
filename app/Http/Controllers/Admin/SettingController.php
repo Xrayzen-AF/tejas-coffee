@@ -41,6 +41,8 @@ class SettingController extends Controller
             'cafe_latitude' => null,
             'cafe_longitude' => null,
             'radius_meter' => 150,
+            // NULL = batas akurasi otomatis (35% radius, 25-60 m).
+            'max_accuracy_meter' => null,
         ];
     }
 
@@ -126,6 +128,7 @@ class SettingController extends Controller
             'cafe_latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_if:geofence_enabled,1'],
             'cafe_longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_if:geofence_enabled,1'],
             'radius_meter' => ['required', 'integer', 'min:10', 'max:10000'],
+            'max_accuracy_meter' => ['nullable', 'integer', 'min:10', 'max:1000'],
         ], [
             'cafe_latitude.required_if' => 'Isi titik cafe (latitude) sebelum mengaktifkan geofence.',
             'cafe_longitude.required_if' => 'Isi titik cafe (longitude) sebelum mengaktifkan geofence.',
@@ -138,6 +141,13 @@ class SettingController extends Controller
         $settings['cafe_latitude'] = ($v['cafe_latitude'] ?? '') === '' ? null : (float) $v['cafe_latitude'];
         $settings['cafe_longitude'] = ($v['cafe_longitude'] ?? '') === '' ? null : (float) $v['cafe_longitude'];
         $settings['radius_meter'] = (int) $v['radius_meter'];
+
+        // Field kosong = kembali otomatis; field tidak dikirim = nilai lama dipertahankan.
+        if (array_key_exists('max_accuracy_meter', $v)) {
+            $settings['max_accuracy_meter'] = $v['max_accuracy_meter'] === null
+                ? null
+                : (int) $v['max_accuracy_meter'];
+        }
 
         if ($settings['geofence_enabled']
             && ($settings['cafe_latitude'] === null || $settings['cafe_longitude'] === null)) {

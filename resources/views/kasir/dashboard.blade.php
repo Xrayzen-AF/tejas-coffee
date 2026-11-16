@@ -20,7 +20,6 @@
         return match (strtoupper($m->kode_metode)) {
             'CASH' => 'Tunai',
             'QRIS' => 'QRIS',
-            'TRANSFER' => 'Transfer',
             default => $m->nama_metode,
         };
     };
@@ -258,6 +257,7 @@
             <nav class="flex items-center gap-5 overflow-x-auto">
                 <a href="#antrian" class="pos-tab">Pesanan Dapur</a>
                 <a href="{{ route('kasir.dashboard') }}" class="pos-tab active">Kasir</a>
+                <a href="{{ route('meja-kode.index') }}" class="pos-tab">Kode Meja</a>
             </nav>
             <div class="ml-auto flex items-center gap-2 sm:gap-3">
                 <form method="GET" action="{{ route('kasir.dashboard') }}" class="pos-pill hidden items-center gap-2 px-3 py-2 md:flex">
@@ -505,9 +505,8 @@
                         </div>
 
                         <p class="mb-1.5 mt-4 text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Cara bayar</p>
-                        <div class="grid grid-cols-3 gap-2">
+                        <div class="grid grid-cols-2 gap-2">
                             <label class="pay relative"><input type="radio" name="metode" value="qris"><span>QRIS</span></label>
-                            <label class="pay relative"><input type="radio" name="metode" value="transfer"><span>Transfer</span></label>
                             <label class="pay relative"><input type="radio" name="metode" value="cash" checked><span>Tunai</span></label>
                         </div>
                         <p class="mt-1.5 text-[10.5px] text-[#9D8E87]" data-metode-hint>Tunai dibayar langsung di kasir.</p>
@@ -515,7 +514,7 @@
                         <button type="submit" class="grotesk mt-3 w-full rounded-lg bg-[#D97706] py-4 text-[18px] font-bold text-[#241708] transition hover:bg-[#B56100]">
                             Buat Pesanan ({{ $idrFull($totalTiket + $biayaLayanan) }})
                         </button>
-                        <p class="mt-2 text-center text-[11px] text-[#9D8E87]">Pesanan langsung masuk ke dapur. QRIS atau transfer bisa dibayar setelah ini.</p>
+                        <p class="mt-2 text-center text-[11px] text-[#9D8E87]">Pesanan langsung masuk ke dapur. QRIS bisa dibayar lewat GoPay, ShopeePay, DANA, OVO, LinkAja, atau m-banking setelah ini.</p>
                     </form>
                 @elseif ($tiketTerpilih)
                     {{-- MODE B: tiket antrian terpilih --}}
@@ -599,7 +598,6 @@
                               data-cash-calc data-total="{{ (int) $t->total_harga }}"
                               data-pay-form data-pesanan="{{ $t->id_pesanan }}" data-nomor="{{ $t->nomor_pesanan }}"
                               data-qris-url="{{ route('pesanan.midtrans.qris', $t->id_pesanan) }}"
-                              data-transfer-url="{{ route('pesanan.midtrans.transfer', $t->id_pesanan) }}"
                               data-status-url="{{ route('pesanan.midtrans.status', $t->id_pesanan) }}">
                             @csrf
                             @method('PATCH')
@@ -638,7 +636,7 @@
                                 <p class="mt-1 text-center text-[10px] text-[#9D8E87]">Kode QR / nomor pembayaran dibuat otomatis.</p>
                             </div>
 
-                            <input type="text" name="nomor_referensi" placeholder="Nomor bukti bayar (untuk QRIS/transfer manual)" class="pos-input mt-2">
+                            <input type="text" name="nomor_referensi" placeholder="Nomor bukti bayar QRIS" class="pos-input mt-2">
                             <button type="submit" data-pay-submit class="grotesk mt-2 w-full rounded-lg bg-[#D97706] py-3.5 text-[16px] font-bold text-[#241708] transition hover:bg-[#B56100]">
                                 Bayar Tunai
                             </button>
@@ -717,7 +715,11 @@
                                 <p class="mt-0.5 text-xs text-[#B8A8A1]">
                                     {{ $tipeLabel($p->tipe_pesanan) }}
                                     @if ($p->meja) • Meja {{ $p->meja->nomor_meja }} @endif
-                                    @if ($p->pelanggan) • {{ $p->pelanggan->nama_pelanggan }} @endif
+                                    @if ($p->pelanggan)
+                                        • {{ $p->pelanggan->nama_pelanggan }}
+                                    @elseif ($p->nama_pemesan)
+                                        • {{ $p->nama_pemesan }}
+                                    @endif
                                     • {{ $p->waktu_pesan?->format('H:i') }}
                                 </p>
                             </div>
@@ -747,7 +749,6 @@
                                       data-cash-calc data-total="{{ (int) $p->total_harga }}"
                                       data-pay-form data-pesanan="{{ $p->id_pesanan }}" data-nomor="{{ $p->nomor_pesanan }}"
                                       data-qris-url="{{ route('pesanan.midtrans.qris', $p->id_pesanan) }}"
-                                      data-transfer-url="{{ route('pesanan.midtrans.transfer', $p->id_pesanan) }}"
                                       data-status-url="{{ route('pesanan.midtrans.status', $p->id_pesanan) }}">
                                     @csrf
                                     @method('PATCH')
@@ -761,7 +762,7 @@
                                     <button type="button" data-calc-open class="calc-launch compact hidden" title="Kalkulator tunai" aria-label="Buka kalkulator tunai">
                                         <i data-lucide="calculator" class="h-4 w-4"></i>
                                     </button>
-                                    <button type="button" data-midtrans-open class="calc-launch compact" title="Bayar QRIS / Transfer" aria-label="Bayar QRIS atau transfer bank">
+                                    <button type="button" data-midtrans-open class="calc-launch compact" title="Bayar QRIS" aria-label="Bayar QRIS via Midtrans">
                                         <i data-lucide="qr-code" class="h-4 w-4"></i>
                                     </button>
                                     <button type="submit" class="rounded-lg bg-[#D97706] px-4 py-2 text-[13px] font-medium text-[#241708] transition hover:bg-[#B56100]">
@@ -841,7 +842,11 @@
                                 {{ $p->waktu_pesan?->format('H:i') }}
                                 • {{ $tipeLabel($p->tipe_pesanan) }}
                                 @if ($p->meja) • Meja {{ $p->meja->nomor_meja }} @endif
-                                @if ($p->pelanggan) • {{ $p->pelanggan->nama_pelanggan }} @endif
+                                @if ($p->pelanggan)
+                                    • {{ $p->pelanggan->nama_pelanggan }}
+                                @elseif ($p->nama_pemesan)
+                                    • {{ $p->nama_pemesan }}
+                                @endif
                             </p>
                         </div>
                         <div class="flex shrink-0 items-center gap-3">
@@ -945,12 +950,12 @@
         </div>
     </div>
 
-    {{-- ═══ MIDTRANS: QRIS / TRANSFER BANK ═══ --}}
+    {{-- ═══ MIDTRANS: QRIS ═══ --}}
     <div id="midtrans-modal" class="pay-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="midtrans-title">
         <div class="pay-sheet" role="document">
             <div class="flex items-start justify-between gap-3 border-b border-[#3D322E] px-5 py-4">
                 <div>
-                    <p class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#D97706]">Pembayaran QRIS / Transfer</p>
+                    <p class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#D97706]">Pembayaran QRIS</p>
                     <h2 id="midtrans-title" class="grotesk text-[20px] font-bold text-[#F1DFD8]">Bayar Pesanan</h2>
                     <p class="mt-0.5 text-[11.5px] text-[#B8A8A1]"><span data-mt-nomor>—</span> • <span data-mt-total>IDR 0</span></p>
                 </div>
@@ -981,15 +986,6 @@
                 </div>
 
                 <div data-mt-flow>
-                    <div class="mt-3 flex gap-2">
-                        <button type="button" class="mt-tab active" data-mt-tab="qris">
-                            <i data-lucide="qr-code" class="h-4 w-4"></i> QRIS
-                        </button>
-                        <button type="button" class="mt-tab" data-mt-tab="transfer">
-                            <i data-lucide="landmark" class="h-4 w-4"></i> Transfer Bank
-                        </button>
-                    </div>
-
                     <div class="mt-3" data-mt-panel="qris">
                         <div data-mt-qris-loading class="hidden py-6 text-center">
                             <div class="mx-auto h-44 w-44 animate-pulse rounded-lg bg-[#2F231D]"></div>
@@ -999,6 +995,12 @@
                             <img data-mt-qr-img class="mt-qr" alt="QRIS pembayaran" width="232" height="232">
                             <p class="mt-2 text-[12px] font-semibold text-[#F1DFD8]">Pindai kode ini dengan aplikasi bank atau e-wallet</p>
                             <p class="mt-0.5 text-[10.5px] text-[#9D8E87]">Jumlahnya sudah sesuai, tidak perlu diubah.</p>
+                            <div class="mt-2.5 flex flex-wrap items-center justify-center gap-1">
+                                @foreach (['GoPay', 'ShopeePay', 'DANA', 'OVO', 'LinkAja'] as $dompet)
+                                    <span class="rounded border border-[#3D322E] bg-[#2F231D] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-[#B8A8A1]">{{ $dompet }}</span>
+                                @endforeach
+                            </div>
+                            <p class="mt-1.5 text-[10px] leading-relaxed text-[#9D8E87]">Satu kode QRIS berlaku untuk semua aplikasi di atas.</p>
                         </div>
                         <div data-mt-qris-empty class="py-2 text-center">
                             <p class="text-[11.5px] leading-relaxed text-[#B8A8A1]">Kode QR berlaku 15 menit untuk satu pesanan.</p>
@@ -1009,43 +1011,6 @@
                         </div>
                     </div>
 
-                    <div class="mt-3 hidden" data-mt-panel="transfer">
-                        <div data-mt-va-form>
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Pilih bank</p>
-                            <div class="mt-2 grid grid-cols-3 gap-2" data-mt-banks>
-                                <button type="button" class="mt-bank active" data-mt-bank="bca">BCA</button>
-                                <button type="button" class="mt-bank" data-mt-bank="bni">BNI</button>
-                                <button type="button" class="mt-bank" data-mt-bank="bri">BRI</button>
-                                <button type="button" class="mt-bank" data-mt-bank="mandiri">Mandiri</button>
-                                <button type="button" class="mt-bank" data-mt-bank="permata">Permata</button>
-                            </div>
-                            <button type="button" data-mt-create="transfer"
-                                    class="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#D97706] px-4 py-3 text-[13px] font-bold text-[#241708] transition hover:bg-[#B56100]">
-                                <i data-lucide="landmark" class="h-4 w-4"></i> Buat Nomor Pembayaran
-                            </button>
-                            <p class="mt-1.5 text-center text-[10px] text-[#9D8E87]">Nomor pembayaran berlaku 15 menit.</p>
-                        </div>
-
-                        <div data-mt-va-loading class="hidden py-8 text-center">
-                            <div class="mx-auto h-24 w-56 animate-pulse rounded-lg bg-[#2F231D]"></div>
-                            <p class="mt-2 text-[11.5px] text-[#B8A8A1]">Membuat nomor pembayaran…</p>
-                        </div>
-
-                        <div data-mt-va-result class="hidden text-center">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-[#B8A8A1]">Nomor Pembayaran <span data-mt-bank-name class="text-[#F59E0B]">BCA</span></p>
-                            <p class="mt-2 text-[10.5px] text-[#9D8E87]">Salin nomor di bawah ini</p>
-                            <p class="mt-1 mt-va" data-mt-va>—</p>
-                            <button type="button" data-mt-copy
-                                    class="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-[#3D322E] bg-[#221A15] px-3 py-1.5 text-[11px] font-semibold text-[#F1DFD8] transition hover:bg-[#2F231D]">
-                                <i data-lucide="copy" class="h-3.5 w-3.5"></i> <span data-mt-copy-label>Salin Nomor</span>
-                            </button>
-                            <div data-mt-mandiri class="mx-auto mt-3 hidden max-w-[260px] rounded-lg border border-[#3D322E] bg-[#221A15] px-3 py-2 text-left text-[11px] text-[#B8A8A1]">
-                                <div class="flex justify-between gap-3"><span>Kode</span><strong class="text-[#F1DFD8]" data-mt-biller>—</strong></div>
-                                <div class="mt-1 flex justify-between gap-3"><span>Nomor</span><strong class="text-[#F1DFD8]" data-mt-billkey>—</strong></div>
-                            </div>
-                            <button type="button" data-mt-new-va class="mt-3 text-[11px] font-medium text-[#9D8E87] underline decoration-dotted hover:text-[#F1DFD8]">Ganti Bank</button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -1551,7 +1516,7 @@
     refresh();
 })();
 
-/* ── Midtrans: QRIS & transfer bank ── */
+/* ── Midtrans: QRIS ── */
 (function () {
     var modal = document.getElementById('midtrans-modal');
     if (!modal) return;
@@ -1564,17 +1529,9 @@
     function idr(n) { return 'IDR ' + new Intl.NumberFormat('id-ID').format(Math.round(Number(n) || 0)); }
 
     var state = {
-        form: null,
-        tab: 'qris',
-        bank: 'bca',
-        payment: null,
-        expires: null,
-        poll: null,
-        ticker: null,
-        reloadTimer: null,
-        busy: false,
-        paid: false,
-        lastFocus: null
+        form: null, payment: null, expires: null,
+        poll: null, ticker: null, reloadTimer: null,
+        busy: false, paid: false, lastFocus: null
     };
 
     function formCode(form) {
@@ -1585,16 +1542,6 @@
         if (!select || select.selectedIndex < 0) return '';
         var option = select.options[select.selectedIndex];
         return option ? (option.getAttribute('data-kode') || '') : '';
-    }
-
-    function showTab(tab) {
-        state.tab = tab;
-        qa('[data-mt-tab]').forEach(function (btn) {
-            btn.classList.toggle('active', btn.getAttribute('data-mt-tab') === tab);
-        });
-        qa('[data-mt-panel]').forEach(function (panel) {
-            panel.classList.toggle('hidden', panel.getAttribute('data-mt-panel') !== tab);
-        });
     }
 
     function setAlert(message) {
@@ -1627,20 +1574,14 @@
         q('[data-mt-qris-loading]').classList.add('hidden');
         q('[data-mt-qris-result]').classList.add('hidden');
         q('[data-mt-qris-empty]').classList.remove('hidden');
-        q('[data-mt-va-form]').classList.remove('hidden');
-        q('[data-mt-va-loading]').classList.add('hidden');
-        q('[data-mt-va-result]').classList.add('hidden');
-        q('[data-mt-mandiri]').classList.add('hidden');
-        q('[data-mt-new-va]').classList.add('hidden');
-        q('[data-mt-qr-img]').removeAttribute('src');
-        q('[data-mt-va]').textContent = '—';
-        state.bank = 'bca';
+
+        var img = q('[data-mt-qr-img]');
+        img.removeAttribute('src');
+        img.classList.add('hidden');
+
         state.payment = null;
         state.expires = null;
         state.paid = false;
-        qa('[data-mt-bank]').forEach(function (btn) {
-            btn.classList.toggle('active', btn.getAttribute('data-mt-bank') === 'bca');
-        });
     }
 
     function stopPolling() {
@@ -1695,7 +1636,9 @@
         q('[data-mt-countdown]').textContent = '';
         setState('Pembayaran gagal', '#F87171');
         setMessage('Pembayaran gagal atau kedaluwarsa. Buat ulang untuk mencoba lagi.');
-        q('[data-mt-new-va]').classList.remove('hidden');
+        q('[data-mt-qris-result]').classList.add('hidden');
+        q('[data-mt-qris-empty]').classList.remove('hidden');
+        state.payment = null;
     }
 
     function renderPayment(payment, statusOverride) {
@@ -1707,36 +1650,18 @@
         }
 
         var status = statusOverride || payment.status || 'menunggu';
-        var method = payment.method || (payment.payment_type === 'qris' ? 'qris' : 'transfer');
 
-        if (method === 'transfer') {
-            showTab('transfer');
-            q('[data-mt-va-form]').classList.add('hidden');
-            q('[data-mt-va-loading]').classList.add('hidden');
-            q('[data-mt-va-result]').classList.remove('hidden');
-            q('[data-mt-bank-name]').textContent = (payment.bank || state.bank || 'BANK').toUpperCase();
-            q('[data-mt-va]').textContent = payment.va_number || 'Membuat nomor…';
+        q('[data-mt-qris-loading]').classList.add('hidden');
+        q('[data-mt-qris-empty]').classList.add('hidden');
+        q('[data-mt-qris-result]').classList.remove('hidden');
 
-            var mandiri = !!(payment.biller_code || payment.bill_key);
-            q('[data-mt-mandiri]').classList.toggle('hidden', !mandiri);
-            if (mandiri) {
-                q('[data-mt-biller]').textContent = payment.biller_code || '—';
-                q('[data-mt-billkey]').textContent = payment.bill_key || '—';
-            }
+        var img = q('[data-mt-qr-img]');
+        if (payment.qr_url) {
+            img.src = payment.qr_url;
+            img.classList.remove('hidden');
         } else {
-            showTab('qris');
-            q('[data-mt-qris-loading]').classList.add('hidden');
-            q('[data-mt-qris-empty]').classList.add('hidden');
-            q('[data-mt-qris-result]').classList.remove('hidden');
-
-            var img = q('[data-mt-qr-img]');
-            if (payment.qr_url) {
-                img.src = payment.qr_url;
-                img.classList.remove('hidden');
-            } else {
-                img.removeAttribute('src');
-                img.classList.add('hidden');
-            }
+            img.removeAttribute('src');
+            img.classList.add('hidden');
         }
 
         startCountdown();
@@ -1761,29 +1686,16 @@
         });
     }
 
-    function createPayment(kind) {
+    function createPayment() {
         if (!state.form || state.busy) return;
         state.busy = true;
         setAlert('');
 
-        if (kind === 'qris') {
-            showTab('qris');
-            q('[data-mt-qris-empty]').classList.add('hidden');
-            q('[data-mt-qris-result]').classList.add('hidden');
-            q('[data-mt-qris-loading]').classList.remove('hidden');
-        } else {
-            showTab('transfer');
-            q('[data-mt-va-form]').classList.add('hidden');
-            q('[data-mt-va-result]').classList.add('hidden');
-            q('[data-mt-va-loading]').classList.remove('hidden');
-        }
+        q('[data-mt-qris-empty]').classList.add('hidden');
+        q('[data-mt-qris-result]').classList.add('hidden');
+        q('[data-mt-qris-loading]').classList.remove('hidden');
 
-        var url = kind === 'qris'
-            ? state.form.getAttribute('data-qris-url')
-            : state.form.getAttribute('data-transfer-url');
-        var body = kind === 'transfer' ? JSON.stringify({ bank: state.bank }) : JSON.stringify({});
-
-        requestJson(url, {
+        requestJson(state.form.getAttribute('data-qris-url'), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
@@ -1791,23 +1703,14 @@
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrf
             },
-            body: body
+            body: JSON.stringify({})
         }).then(function (data) {
             renderPayment(data.payment);
             startPolling();
-            if (data.reused && data.payment && data.payment.method !== kind) {
-                setMessage('Masih ada pembayaran ' + (data.payment.method === 'qris' ? 'QRIS' : 'transfer')
-                    + ' yang belum selesai. Selesaikan dulu atau tunggu kedaluwarsa.');
-            }
             checkStatus();
         }).catch(function (err) {
-            if (kind === 'qris') {
-                q('[data-mt-qris-loading]').classList.add('hidden');
-                q('[data-mt-qris-empty]').classList.remove('hidden');
-            } else {
-                q('[data-mt-va-loading]').classList.add('hidden');
-                q('[data-mt-va-form]').classList.remove('hidden');
-            }
+            q('[data-mt-qris-loading]').classList.add('hidden');
+            q('[data-mt-qris-empty]').classList.remove('hidden');
             setAlert(err.message);
             setState('Belum dibuat', '#F87171');
         }).finally(function () {
@@ -1843,31 +1746,6 @@
         state.poll = window.setInterval(checkStatus, 4000);
     }
 
-    function copyText(text) {
-        var label = q('[data-mt-copy-label]');
-        var done = function () {
-            label.textContent = 'Tersalin ✓';
-            window.setTimeout(function () { label.textContent = 'Salin Nomor'; }, 1600);
-        };
-
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
-        } else {
-            fallbackCopy(text, done);
-        }
-    }
-
-    function fallbackCopy(text, done) {
-        var area = document.createElement('textarea');
-        area.value = text;
-        area.style.position = 'fixed';
-        area.style.opacity = '0';
-        document.body.appendChild(area);
-        area.select();
-        try { document.execCommand('copy'); done(); } catch (err) {}
-        document.body.removeChild(area);
-    }
-
     function open(form) {
         state.form = form;
         state.lastFocus = document.activeElement;
@@ -1882,22 +1760,11 @@
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
 
-        var code = formCode(form);
-        var kind = code === 'TRANSFER' ? 'transfer' : 'qris';
-        showTab(kind);
-
         window.setTimeout(function () {
             if (state.payment) return;
-            if (kind === 'transfer') {
-                q('[data-mt-va-form]').classList.remove('hidden');
-                var active = q('[data-mt-bank].active') || q('[data-mt-bank]');
-                if (active) active.focus();
-            } else {
-                createPayment('qris');
-            }
+            createPayment();
         }, 80);
 
-        // Lanjutkan pembayaran yang sudah dibuat sebelumnya (jika ada).
         var statusUrl = form.getAttribute('data-status-url');
         if (statusUrl) {
             requestJson(statusUrl, {
@@ -1955,49 +1822,8 @@
         if (e.target === modal) { close(); return; }
         if (e.target.closest('[data-mt-close]')) { e.preventDefault(); close(); return; }
 
-        var tab = e.target.closest('[data-mt-tab]');
-        if (tab) {
-            showTab(tab.getAttribute('data-mt-tab'));
-            if (state.payment && state.payment.method && state.tab !== state.payment.method && !state.paid) {
-                setMessage('Masih ada pembayaran ' + (state.payment.method === 'qris' ? 'QRIS' : 'transfer')
-                    + ' yang belum selesai. Selesaikan dulu atau tunggu kedaluwarsa.');
-            }
-            return;
-        }
-
-        var bank = e.target.closest('[data-mt-bank]');
-        if (bank) {
-            state.bank = bank.getAttribute('data-mt-bank');
-            qa('[data-mt-bank]').forEach(function (btn) {
-                btn.classList.toggle('active', btn === bank);
-            });
-            return;
-        }
-
-        var create = e.target.closest('[data-mt-create]');
-        if (create) {
-            e.preventDefault();
-            createPayment(create.getAttribute('data-mt-create'));
-            return;
-        }
-
+        if (e.target.closest('[data-mt-create]')) { e.preventDefault(); createPayment(); return; }
         if (e.target.closest('[data-mt-check]')) { e.preventDefault(); checkStatus(); return; }
-
-        if (e.target.closest('[data-mt-copy]')) {
-            e.preventDefault();
-            if (state.payment && state.payment.va_number) copyText(state.payment.va_number);
-            return;
-        }
-
-        if (e.target.closest('[data-mt-new-va]')) {
-            e.preventDefault();
-            state.payment = null;
-            state.expires = null;
-            q('[data-mt-va-result]').classList.add('hidden');
-            q('[data-mt-va-form]').classList.remove('hidden');
-            setState('Menunggu Pembayaran', '#FBBF24');
-            setMessage('Pilih bank lalu buat nomor pembayaran baru.');
-        }
     });
 
     document.addEventListener('keydown', function (e) {
@@ -2006,11 +1832,11 @@
         if (e.key === 'Tab') trapFocus(e);
     }, true);
 
-    // Tampilkan panel yang sesuai dengan metode bayar terpilih.
+    // Panel "catat pembayaran manual" mengikuti metode terpilih.
     function syncPanels() {
         Array.prototype.forEach.call(document.querySelectorAll('form[data-pay-form]'), function (form) {
             var code = formCode(form);
-            var nonCash = code === 'QRIS' || code === 'TRANSFER';
+            var nonCash = code === 'QRIS';
 
             var panel = form.querySelector('[data-midtrans-panel]');
             if (panel) {
@@ -2018,8 +1844,8 @@
                 if (nonCash) {
                     var caption = panel.querySelector('[data-midtrans-caption]');
                     var cta = panel.querySelector('[data-midtrans-cta]');
-                    if (caption) caption.textContent = code === 'QRIS' ? 'Bayar QRIS lewat Midtrans' : 'Transfer lewat Midtrans';
-                    if (cta) cta.textContent = code === 'QRIS' ? 'Buat Kode QR' : 'Buat Nomor Pembayaran';
+                    if (caption) caption.textContent = 'Bayar QRIS lewat Midtrans';
+                    if (cta) cta.textContent = 'Buat Kode QR';
                 }
             }
 
@@ -2048,9 +1874,7 @@
 
         hint.textContent = checked.value === 'qris'
             ? 'Kode QR muncul setelah pesanan dibuat, lalu dibayar lewat Midtrans.'
-            : (checked.value === 'transfer'
-                ? 'Nomor pembayaran muncul setelah pesanan dibuat, lalu dibayar lewat Midtrans.'
-                : 'Tunai dibayar langsung di kasir.');
+            : 'Tunai dibayar langsung di kasir.';
     }
 
     syncPanels();
@@ -2062,11 +1886,10 @@
         if (e.target.matches('input[name="metode"]')) syncDraftHint();
     });
 
-    // Setelah "Buat Pesanan" dengan QRIS/Transfer, langsung buka pembayaran.
+    // Setelah "Buat Pesanan" dengan QRIS, langsung buka pembayaran.
     (function autoOpen() {
         var params = new URLSearchParams(window.location.search);
-        var bayar = (params.get('bayar') || '').toLowerCase();
-        if (bayar !== 'qris' && bayar !== 'transfer') return;
+        if ((params.get('bayar') || '').toLowerCase() !== 'qris') return;
 
         var ticketId = params.get('ticket');
         var target = null;
@@ -2076,9 +1899,8 @@
         });
 
         if (!target) return;
-        var code = bayar === 'qris' ? 'QRIS' : 'TRANSFER';
         window.setTimeout(function () {
-            if (formCode(target) !== code) return;
+            if (formCode(target) !== 'QRIS') return;
             open(target);
 
             try {

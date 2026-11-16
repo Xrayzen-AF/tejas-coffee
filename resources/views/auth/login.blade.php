@@ -75,6 +75,13 @@
                 </div>
             </div>
 
+            {{-- Ingat saya: cookie jangka panjang, sesi tidak cepat habis --}}
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" name="remember" value="1" {{ old('remember') ? 'checked' : '' }}
+                       class="h-4 w-4 rounded border-[#3D322E] bg-[#1E1511] text-[#D97706] focus:ring-[#D97706]">
+                <span class="text-[11px] text-[#B8A8A1]">Ingat saya di perangkat ini</span>
+            </label>
+
             <div>
                 <button type="submit"
                         class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-md font-grotesk text-[11px] font-semibold uppercase tracking-[0.12em] text-[#241708] bg-[#B56100] hover:bg-[#D97706] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D97706] transition-colors">

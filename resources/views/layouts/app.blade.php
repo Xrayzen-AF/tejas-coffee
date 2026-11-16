@@ -269,36 +269,38 @@
                     });
                 }
 
-                // Ambil beberapa sampel singkat lalu pakai pembacaan paling akurat.
+                // Opsi khusus dalam ruangan: lokasi berbasis jaringan (WiFi/seluler),
+                // bukan GPS presisi tinggi yang mudah timeout di dalam gedung.
                 function ambilPosisi(selesai) {
-                    var terbaik = null, berhenti = false, id = null, timer = null;
+                    var berhenti = false, timer = null;
 
-                    function tutup() {
+                    function tutup(pos) {
                         if (berhenti) return;
                         berhenti = true;
                         clearTimeout(timer);
-                        if (id !== null) navigator.geolocation.clearWatch(id);
-                        selesai(terbaik);
+                        selesai(pos || null);
                     }
 
-                    id = navigator.geolocation.watchPosition(function (pos) {
-                        if (!terbaik || pos.coords.accuracy < terbaik.coords.accuracy) {
-                            terbaik = pos;
-                        }
-                        if (terbaik.coords.accuracy <= 25) tutup();
+                    navigator.geolocation.getCurrentPosition(function (pos) {
+                        tutup(pos);
                     }, function (err) {
-                        if (err.code === 1) {
-                            keGerbang();
-                            tutup();
-                        }
-                        // Kode 2/3 sering sementara: tunggu sampai batas waktu.
-                    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                        if (err && err.code === 1) keGerbang();
+                        tutup(null);
+                    }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 });
 
-                    timer = setTimeout(tutup, 6000);
+                    timer = setTimeout(function () { tutup(null); }, 16000);
                 }
 
                 function cekPosisi() {
                     if (busy || kicked || document.hidden) return;
+
+                    // Di HTTP browser memblokir GPS: jangan menunggu timeout,
+                    // langsung antar pelanggan ke gerbang (yang menjelaskan HTTPS).
+                    if (!window.isSecureContext
+                        && !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname)) {
+                        keGerbang();
+                        return;
+                    }
 
                     if (!('geolocation' in navigator)) {
                         keGerbang();
