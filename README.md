@@ -218,18 +218,6 @@ docs/                           Dokumentasi Sprint 4 (manual, teknis, API, slide
 screenshots/                    Tangkapan layar dokumentasi UI
 ```
 
-## 📚 11. Dokumentasi Sprint 4
-
-| Artefak | Berkas |
-|---|---|
-| Log bug fixing & Git tag (S4-01) | [`docs/01-release/`](docs/01-release/) |
-| Deployment & kontingensi offline (S4-02) | [`docs/08-deployment/DEPLOYMENT.md`](docs/08-deployment/DEPLOYMENT.md) |
-| User Manual (S4-03) | [`docs/03-manual/USER_MANUAL.docx`](docs/03-manual/USER_MANUAL.docx) |
-| Dokumentasi teknis (S4-03) | [`docs/03-technical/TECHNICAL_DOCS.md`](docs/03-technical/TECHNICAL_DOCS.md) |
-| Spesifikasi API (S4-05) | [`docs/04-api/openapi.json`](docs/04-api/openapi.json) |
-| Slide presentasi (S4-06) | [`docs/05-presentation/pitch-deck.html`](docs/05-presentation/pitch-deck.html), struktur: [`docs/05-presentation/S4-06_struktur-pitch-deck.docx`](docs/05-presentation/S4-06_struktur-pitch-deck.docx) |
-| Protokol gladi bersih & berita acara (S4-07) | [`docs/06-demo/S4-07_protokol-gladi-bersih-dan-live-demo.docx`](docs/06-demo/S4-07_protokol-gladi-bersih-dan-live-demo.docx), [`docs/06-demo/`](docs/06-demo/) |
-| Bank soal defense (S4-08) | [`docs/07-defense/BANK_SOAL_DEFENSE.docx`](docs/07-defense/BANK_SOAL_DEFENSE.docx) |
 
 Indeks lengkap: [`docs/README.md`](docs/README.md).
 
