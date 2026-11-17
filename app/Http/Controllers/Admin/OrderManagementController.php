@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\MetodePembayaran;
 use App\Models\Pesanan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,18 +20,36 @@ class OrderManagementController extends Controller
     public function index(Request $request): View
     {
         $status = $request->query('status');
+        if (! in_array($status, Pesanan::STATUS_PESANAN, true)) {
+            $status = null;
+        }
 
-        $pesanan = Pesanan::with(['detailPesanan.produk:id_produk,nama_produk', 'meja:id_meja,nomor_meja', 'transaksi'])
-            ->when(in_array($status, Pesanan::STATUS_PESANAN, true), fn ($q) => $q->where('status_pesanan', $status))
+        // Filter metode pembayaran memakai id_metode (Tunai, QRIS, ...).
+        $metodeList = MetodePembayaran::orderBy('id_metode')->get();
+        $metode = $request->filled('metode') ? (int) $request->query('metode') : null;
+        if ($metode && ! $metodeList->contains('id_metode', $metode)) {
+            $metode = null;
+        }
+
+        $terfilter = Pesanan::query()
+            ->when($status, fn ($q) => $q->where('status_pesanan', $status))
+            ->when($metode, fn ($q) => $q->whereHas('transaksi',
+                fn ($t) => $t->where('id_metode', $metode)));
+
+        $pesanan = (clone $terfilter)
+            ->with(['detailPesanan.produk:id_produk,nama_produk', 'meja:id_meja,nomor_meja', 'transaksi.metodePembayaran'])
             ->orderByDesc('waktu_pesan')
             ->paginate(10)
             ->withQueryString();
 
+        // Angka kartu status ikut filter metode agar konsisten dengan daftar.
         $hitung = [];
         foreach (Pesanan::STATUS_PESANAN as $s) {
-            $hitung[$s] = $s === $status
-                ? $pesanan->total()
-                : Pesanan::where('status_pesanan', $s)->count();
+            $hitung[$s] = Pesanan::query()
+                ->where('status_pesanan', $s)
+                ->when($metode, fn ($q) => $q->whereHas('transaksi',
+                    fn ($t) => $t->where('id_metode', $metode)))
+                ->count();
         }
 
         return view('admin.orders.index', [
@@ -39,6 +58,13 @@ class OrderManagementController extends Controller
             'statusAktif' => $status,
             'statuses' => Pesanan::STATUS_PESANAN,
             'transisi' => Pesanan::TRANSISI_STATUS,
+            'metodeList' => $metodeList,
+            'metodeAktif' => $metode,
+            'jumlahTerfilter' => (clone $terfilter)->count(),
+            // Pesanan batal tidak dihitung sebagai nilai transaksi.
+            'totalTerfilter' => (float) (clone $terfilter)
+                ->where('status_pesanan', '!=', 'dibatalkan')
+                ->sum('total_harga'),
             'activeMenu' => 'orders',
         ]);
     }

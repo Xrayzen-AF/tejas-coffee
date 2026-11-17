@@ -511,19 +511,80 @@ class DashboardController extends Controller
 
     /**
      * Riwayat pesanan pelanggan di halaman terpisah (bukan di beranda).
+     * Filter (status, tipe, rentang tanggal, cari nomor) berlaku untuk daftar
+     * sekaligus ringkasan jumlah & total belanja hasil filter.
      */
     public function riwayat(Request $request)
     {
         $pengguna = $request->user();
         $dataPelanggan = $this->dataPelanggan($pengguna);
 
+        $status = (string) $request->query('status', '');
+        if (! in_array($status, Pesanan::STATUS_PESANAN, true)) {
+            $status = '';
+        }
+
+        $tipe = (string) $request->query('tipe', '');
+        if (! in_array($tipe, Pesanan::TIPE_PESANAN, true)) {
+            $tipe = '';
+        }
+
+        $cari = trim((string) $request->query('cari', ''));
+        $dari = $this->tanggalRiwayat($request->query('dari'));
+        $sampai = $this->tanggalRiwayat($request->query('sampai'));
+
+        // Rentang terbalik tetap masuk akal: tukar batasnya.
+        if ($dari && $sampai && $dari->greaterThan($sampai)) {
+            [$dari, $sampai] = [$sampai, $dari];
+        }
+
+        $terfilter = $this->pesananMilikSendiri($pengguna, $dataPelanggan)
+            ->when($status !== '', fn ($q) => $q->where('status_pesanan', $status))
+            ->when($tipe !== '', fn ($q) => $q->where('tipe_pesanan', $tipe))
+            ->when($cari !== '', fn ($q) => $q->where('nomor_pesanan', 'like', "%{$cari}%"))
+            ->when($dari, fn ($q) => $q->whereDate('waktu_pesan', '>=', $dari->toDateString()))
+            ->when($sampai, fn ($q) => $q->whereDate('waktu_pesan', '<=', $sampai->toDateString()));
+
+        $adaFilter = $status !== '' || $tipe !== '' || $cari !== '' || $dari || $sampai;
+
         return view('pelanggan.riwayat', [
-            'riwayatPesanan' => $this->pesananMilikSendiri($pengguna, $dataPelanggan)
+            'riwayatPesanan' => (clone $terfilter)
                 ->latest('waktu_pesan')
                 ->paginate(10)
                 ->withQueryString(),
             'member' => $dataPelanggan,
+            'jumlahTerfilter' => (clone $terfilter)->count(),
+            // Pesanan batal tidak dihitung sebagai belanja.
+            'totalTerfilter' => (float) (clone $terfilter)
+                ->where('status_pesanan', '!=', 'dibatalkan')
+                ->sum('total_harga'),
+            'adaFilter' => $adaFilter,
+            'filter' => [
+                'status' => $status,
+                'tipe' => $tipe,
+                'cari' => $cari,
+                'dari' => $dari?->toDateString() ?? '',
+                'sampai' => $sampai?->toDateString() ?? '',
+            ],
+            'statuses' => Pesanan::STATUS_PESANAN,
+            'tipes' => Pesanan::TIPE_PESANAN,
         ]);
+    }
+
+    /** Parse parameter tanggal `Y-m-d`; nilai tidak valid diabaikan. */
+    private function tanggalRiwayat(mixed $nilai): ?\Illuminate\Support\Carbon
+    {
+        if (! is_string($nilai) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $nilai)) {
+            return null;
+        }
+
+        try {
+            $tanggal = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $nilai);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $tanggal && $tanggal->format('Y-m-d') === $nilai ? $tanggal : null;
     }
 
     /** Data member pelanggan berdasarkan nomor telepon akun (boleh null). */

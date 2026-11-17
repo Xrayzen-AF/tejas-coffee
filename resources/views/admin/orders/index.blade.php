@@ -11,7 +11,7 @@
 
   <section class="metrics-grid" style="grid-template-columns: repeat(4, 1fr);">
     @foreach ($statuses as $s)
-      <a href="{{ route('admin.orders.index', ['status' => $s]) }}" class="metric-card" style="text-decoration:none;color:inherit;">
+      <a href="{{ route('admin.orders.index', array_filter(['status' => $s, 'metode' => $metodeAktif])) }}" class="metric-card" style="text-decoration:none;color:inherit;">
         <div class="metric-header"><span>{{ ucfirst($s) }}</span><div class="metric-icon"><i data-lucide="{{ $s === 'baru' ? 'inbox' : ($s === 'diproses' ? 'flame' : ($s === 'selesai' ? 'check-circle-2' : 'x-circle')) }}" size="16"></i></div></div>
         <div class="metric-value" @if($s === 'dibatalkan') style="color:var(--accent-alert);" @endif>{{ $hitung[$s] }}</div>
         <div class="metric-sub">{{ $statusAktif === $s ? 'Filter aktif — klik untuk reset' : 'Klik untuk filter' }}</div>
@@ -19,11 +19,46 @@
     @endforeach
   </section>
 
+  {{-- Filter riwayat transaksi: status pesanan + metode pembayaran. --}}
+  <section class="card" style="margin-top:20px;">
+    <form method="GET" action="{{ route('admin.orders.index') }}" style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;justify-content:space-between;">
+      <div style="display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;">
+        <div class="form-group" style="margin-bottom:0;min-width:160px;">
+          <label class="form-label" for="filter-status">Status pesanan</label>
+          <select id="filter-status" name="status" class="form-select">
+            <option value="">Semua status</option>
+            @foreach ($statuses as $s)
+              <option value="{{ $s }}" @selected($statusAktif === $s)>{{ ucfirst($s) }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;min-width:180px;">
+          <label class="form-label" for="filter-metode">Metode pembayaran</label>
+          <select id="filter-metode" name="metode" class="form-select">
+            <option value="">Semua metode</option>
+            @foreach ($metodeList as $m)
+              <option value="{{ $m->id_metode }}" @selected($metodeAktif === $m->id_metode)>{{ $m->nama_metode }}</option>
+            @endforeach
+          </select>
+        </div>
+        <button type="submit" class="btn-sm primary"><i data-lucide="filter" size="13"></i> Terapkan</button>
+        @if ($statusAktif || $metodeAktif)
+          <a href="{{ route('admin.orders.index') }}" class="btn-sm"><i data-lucide="x" size="13"></i> Reset</a>
+        @endif
+      </div>
+      <div style="text-align:right;">
+        <div class="emp-email">Hasil filter</div>
+        <div><strong>{{ $jumlahTerfilter }} pesanan</strong> • <strong style="color:var(--accent-caramel);">Rp {{ number_format($totalTerfilter, 0, ',', '.') }}</strong></div>
+        <div class="emp-email">Total tanpa pesanan dibatalkan</div>
+      </div>
+    </form>
+  </section>
+
   <section class="card" style="margin-top:20px;">
     <div class="card-title-row">
       <div><h3>Daftar Pesanan</h3><p>State machine: baru → diproses → selesai (dibatalkan kapan saja selama belum lunas/selesai)</p></div>
-      @if ($statusAktif)
-        <a href="{{ route('admin.orders.index') }}" class="btn-sm"><i data-lucide="x" size="13"></i> Reset filter {{ $statusAktif }}</a>
+      @if ($statusAktif || $metodeAktif)
+        <a href="{{ route('admin.orders.index') }}" class="btn-sm"><i data-lucide="x" size="13" aria-hidden="true"></i> Reset filter</a>
       @endif
     </div>
 
@@ -60,6 +95,9 @@
               @else
                 <span class="emp-email">—</span>
               @endif
+              @if ($p->transaksi?->metodePembayaran)
+                <div class="emp-email">{{ $p->transaksi->metodePembayaran->nama_metode }}</div>
+              @endif
             </td>
             <td>
               @if ($p->status_pesanan === 'baru')
@@ -90,8 +128,7 @@
               </div>
             </td>
           </tr>
-        @empty
-          <tr><td colspan="7"><div class="empty-state">Tidak ada pesanan {{ $statusAktif ? "dengan status {$statusAktif}" : 'tercatat' }}.</div></td></tr>
+        @empty            <tr><td colspan="7"><div class="empty-state">Tidak ada pesanan {{ $statusAktif || $metodeAktif ? 'yang cocok dengan filter' : 'tercatat' }}.</div></td></tr>
         @endforelse
         </tbody>
       </table>
@@ -135,6 +172,9 @@
                 @else
                   <span class="text-[#B8A8A1]">—</span>
                 @endif
+                @if ($p->transaksi?->metodePembayaran)
+                  <div class="mt-0.5 text-[11px] text-[#B8A8A1]">{{ $p->transaksi->metodePembayaran->nama_metode }}</div>
+                @endif
               </dd>
             </div>
             <div class="col-span-2">
@@ -166,7 +206,7 @@
           </div>
         </article>
       @empty
-        <div class="empty-state">Tidak ada pesanan {{ $statusAktif ? "dengan status {$statusAktif}" : 'tercatat' }}.</div>
+        <div class="empty-state">Tidak ada pesanan {{ $statusAktif || $metodeAktif ? 'yang cocok dengan filter' : 'tercatat' }}.</div>
       @endforelse
     </div>
 

@@ -233,6 +233,39 @@ class DashboardRenderTest extends TestCase
         $this->assertSame(3, $response->viewData('riwayatPesanan')->count());
     }
 
+    public function test_riwayat_pelanggan_bisa_difilter_dengan_total_terfilter(): void
+    {
+        $pengguna = Pengguna::factory()->create(['peran' => 'pelanggan']);
+
+        Pesanan::factory()->create([
+            'id_pengguna' => $pengguna->id_pengguna,
+            'status_pesanan' => 'selesai',
+            'total_harga' => 30000,
+            'waktu_pesan' => now()->subDays(2),
+        ]);
+        Pesanan::factory()->create([
+            'id_pengguna' => $pengguna->id_pengguna,
+            'status_pesanan' => 'dibatalkan',
+            'total_harga' => 20000,
+            'waktu_pesan' => now(),
+        ]);
+
+        $semua = $this->actingAs($pengguna)->get(route('pelanggan.riwayat'));
+        $semua->assertOk();
+        $this->assertSame(2, $semua->viewData('jumlahTerfilter'));
+        // Pesanan dibatalkan tidak ikut dihitung sebagai belanja.
+        $this->assertSame(30000.0, $semua->viewData('totalTerfilter'));
+
+        $filter = $this->actingAs($pengguna)->get(route('pelanggan.riwayat', [
+            'status' => 'selesai',
+            'dari' => now()->subDays(7)->toDateString(),
+        ]));
+        $filter->assertOk();
+        $this->assertSame(1, $filter->viewData('jumlahTerfilter'));
+        $this->assertSame(30000.0, $filter->viewData('totalTerfilter'));
+        $this->assertSame(1, $filter->viewData('riwayatPesanan')->count());
+    }
+
     public function test_kasir_bisa_serah_terima_pesanan_baru_yang_sudah_lunas(): void
     {
         $pesanan = Pesanan::factory()->create(['status_pesanan' => 'baru', 'total_harga' => 22000]);
