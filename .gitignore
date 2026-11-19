@@ -27,3 +27,6 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /.cloud-attachments
+
+# Paket deploy (berisi .env produksi + dump database)
+/dist
