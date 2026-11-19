@@ -14,6 +14,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 APP_DIR="$(pwd)"
 
+# Skrip ini biasanya dijalankan dengan sudo; beri tahu Composer agar tidak menolak.
+export COMPOSER_ALLOW_SUPERUSER=1
+
 RUN_SEED=0
 APP_URL_ARG=""
 for arg in "$@"; do

@@ -30,6 +30,8 @@ if [ -z "$DB_PASS" ]; then
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+# Cegah needrestart menahan skrip dengan pertanyaan interaktif.
+export NEEDRESTART_MODE=a
 
 echo "==> [1/8] Memperbarui paket sistem"
 apt-get update -y
