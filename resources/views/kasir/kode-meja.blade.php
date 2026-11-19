@@ -45,6 +45,8 @@
   .km-note { margin-top: 20px; font-size: 11px; line-height: 1.7; color: #82746E; max-width: 760px; }
 </style>
 
+@include('kasir._notif-meja')
+
 <div class="km-wrap" data-km-root data-status-url="{{ route('meja-kode.status') }}">
     <div class="km-head">
         <div>
@@ -134,7 +136,6 @@
     if (! root) { return; }
 
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
-    const statusUrl = root.dataset.statusUrl;
     const cards = Array.from(document.querySelectorAll('[data-meja-card]'));
 
     const sumKosong = root.querySelector('[data-sum-kosong]');
@@ -311,56 +312,56 @@
         });
     });
 
-    async function poll() {
-        if (document.hidden) { return; }
+    // Data status datang dari partial notifikasi meja (satu polling untuk
+    // halaman ini + bunyi/toast "Minta PIN" dan "Meja dilepas").
+    function terapkanStatus(data) {
+        const byId = {};
 
-        try {
-            const res = await fetch(statusUrl, { headers: { 'Accept': 'application/json' } });
-            if (! res.ok) { return; }
+        (data.tables || []).forEach(function (t) { byId[t.id_meja] = t; });
 
-            const data = await res.json();
-            const byId = {};
+        cards.forEach(function (card) {
+            const info = byId[card.dataset.id];
+            if (! info) { return; }
 
-            (data.tables || []).forEach(function (t) { byId[t.id_meja] = t; });
+            setStatus(card, info.status);
 
-            cards.forEach(function (card) {
-                const data = byId[card.dataset.id];
-                if (! data) { return; }
+            // Penanda pelanggan yang menunggu PIN untuk meja ini.
+            const req = card.querySelector('[data-pin-req]');
+            if (req) {
+                const detik = info.permintaan_detik;
 
-                setStatus(card, data.status);
+                if (detik !== null && detik !== undefined) {
+                    req.hidden = false;
+                    req.textContent = 'Minta PIN · ' + detik + 's';
 
-                // Penanda pelanggan yang menunggu PIN untuk meja ini.
-                const req = card.querySelector('[data-pin-req]');
-                if (req) {
-                    const detik = data.permintaan_detik;
-
-                    if (detik !== null && detik !== undefined) {
-                        req.hidden = false;
-                        req.textContent = 'Minta PIN · ' + detik + 's';
-
-                        const kodeTampil = card.querySelector('[data-kode]');
-                        if (kodeTampil && kodeTampil.classList.contains('muted')) {
-                            const label = card.querySelector('[data-terbitkan-label]');
-                            if (label) label.textContent = 'Kirim PIN';
-                        }
-                    } else {
-                        req.hidden = true;
+                    const kodeTampil = card.querySelector('[data-kode]');
+                    if (kodeTampil && kodeTampil.classList.contains('muted')) {
+                        const label = card.querySelector('[data-terbitkan-label]');
+                        if (label) label.textContent = 'Kirim PIN';
                     }
+                } else {
+                    req.hidden = true;
                 }
+            }
 
-                // Jangan ganggu PIN yang sedang ditampilkan di kartu ini.
-                if (card.querySelector('[data-kode]').classList.contains('muted')) {
-                    applySisa(Number(data.sisa_detik) || 0);
-                }
-            });
+            // Jangan ganggu PIN yang sedang ditampilkan di kartu ini.
+            if (card.querySelector('[data-kode]').classList.contains('muted')) {
+                applySisa(Number(info.sisa_detik) || 0);
+            }
+        });
 
-            refreshSummary();
-        } catch (err) {
-            // Diamkan: polling berikutnya akan mencoba lagi.
-        }
+        refreshSummary();
     }
 
-    setInterval(poll, 20000);
+    document.addEventListener('tejas:meja-status', function (event) {
+        if (event.detail && Array.isArray(event.detail.tables)) {
+            terapkanStatus(event.detail);
+        }
+    });
+
+    // Ambil status terbaru setelah listener terpasang (partial notifikasi
+    // mungkin sudah selesai polling sebelum skrip ini berjalan).
+    if (window.tejasMejaStatus) { window.tejasMejaStatus.refresh(); }
 })();
 </script>
 @endpush

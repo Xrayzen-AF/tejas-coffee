@@ -13,9 +13,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * QRIS diprakarsai pelanggan: otorisasi memakai sesi pemilik pesanan
- * (akun atau sesi tamu), QR ditampilkan, dan polling bisa menyinkronkan
- * status langsung ke Midtrans.
+ * QRIS diprakarsai pelanggan login: otorisasi memakai akun pemilik pesanan
+ * (tamu tanpa akun tidak lagi bisa memesan), QR ditampilkan, dan polling bisa
+ * menyinkronkan status langsung ke Midtrans.
  */
 class CustomerQrisPaymentTest extends TestCase
 {
@@ -82,27 +82,44 @@ class CustomerQrisPaymentTest extends TestCase
         ]);
     }
 
-    public function test_tamu_bisa_membuat_charge_qris_untuk_pesanannya(): void
+    /** Login pelanggan ber-nomor HP agar alur pesan web terbuka. */
+    private function masukPelanggan(string $nomor = '081234567890'): Pengguna
     {
-        $this->siapkanMidtrans();
-        $fake = $this->fakeMidtrans();
-        $pesanan = $this->pesananTamu();
+        $pengguna = Pengguna::factory()->create([
+            'peran' => 'pelanggan',
+            'nomor_telepon' => $nomor,
+        ]);
 
-        $this->withSession(['tamu_pesanan' => [$pesanan->id_pesanan]])
-            ->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
-            ->assertOk()
-            ->assertJsonPath('status', 'success')
-            ->assertJsonPath('payment.qr_url', 'https://api.midtrans.com/v4/qris/aspi/qr-code');
+        $this->actingAs($pengguna);
 
-        $this->assertSame('qris', $fake->lastParams['payment_type']);
-        $this->assertSame('menunggu', $pesanan->transaksi()->first()->status_pembayaran);
+        return $pengguna;
     }
 
-    public function test_tamu_lain_tidak_bisa_membuat_charge(): void
+    public function test_tamu_tidak_bisa_membuat_charge_qris(): void
     {
         $this->siapkanMidtrans();
         $this->fakeMidtrans();
         $pesanan = $this->pesananTamu();
+
+        $this->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
+            ->assertUnauthorized();
+
+        $this->assertNull($pesanan->transaksi()->first());
+    }
+
+    public function test_member_lain_tidak_bisa_membuat_charge(): void
+    {
+        $this->siapkanMidtrans();
+        $this->fakeMidtrans();
+
+        $pemilik = Pengguna::factory()->create(['peran' => 'pelanggan', 'nomor_telepon' => '081234567891']);
+        $pesanan = Pesanan::factory()->create([
+            'id_pengguna' => $pemilik->id_pengguna,
+            'status_pesanan' => 'baru',
+            'total_harga' => 25000,
+        ]);
+
+        $this->masukPelanggan('081234567892');
 
         $this->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
             ->assertForbidden();
@@ -134,7 +151,12 @@ class CustomerQrisPaymentTest extends TestCase
     {
         $this->siapkanMidtrans();
         $this->fakeMidtrans();
-        $pesanan = $this->pesananTamu();
+        $pengguna = $this->masukPelanggan();
+        $pesanan = Pesanan::factory()->create([
+            'id_pengguna' => $pengguna->id_pengguna,
+            'status_pesanan' => 'baru',
+            'total_harga' => 25000,
+        ]);
 
         $pesanan->transaksi()->create([
             'id_metode' => MetodePembayaran::create([
@@ -149,8 +171,7 @@ class CustomerQrisPaymentTest extends TestCase
             'waktu_pembayaran' => now(),
         ]);
 
-        $this->withSession(['tamu_pesanan' => [$pesanan->id_pesanan]])
-            ->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
+        $this->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
             ->assertStatus(422)
             ->assertJsonPath('message', 'Pesanan ini sudah lunas.');
     }
@@ -159,10 +180,14 @@ class CustomerQrisPaymentTest extends TestCase
     {
         $this->siapkanMidtrans();
         $fake = $this->fakeMidtrans();
-        $pesanan = $this->pesananTamu();
+        $pengguna = $this->masukPelanggan();
+        $pesanan = Pesanan::factory()->create([
+            'id_pengguna' => $pengguna->id_pengguna,
+            'status_pesanan' => 'baru',
+            'total_harga' => 25000,
+        ]);
 
-        $this->withSession(['tamu_pesanan' => [$pesanan->id_pesanan]])
-            ->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
+        $this->postJson(route('pelanggan.pesanan.bayar-qris', $pesanan->id_pesanan))
             ->assertOk();
 
         $fake->remote = [
@@ -175,8 +200,7 @@ class CustomerQrisPaymentTest extends TestCase
             'issuer' => 'shopeepay',
         ];
 
-        $this->withSession(['tamu_pesanan' => [$pesanan->id_pesanan]])
-            ->getJson(route('pelanggan.pesanan.status-live', $pesanan->id_pesanan).'?sync=1')
+        $this->getJson(route('pelanggan.pesanan.status-live', $pesanan->id_pesanan).'?sync=1')
             ->assertOk()
             ->assertJsonPath('status_pembayaran', 'lunas');
 
@@ -203,6 +227,7 @@ class CustomerQrisPaymentTest extends TestCase
     public function test_checkout_menawarkan_qris_dan_tunai_di_kasir(): void
     {
         $this->siapkanMidtrans();
+        $this->masukPelanggan();
         $produk = $this->buatMenu();
         $this->post(route('pelanggan.keranjang.tambah', $produk->id_produk));
 
@@ -217,12 +242,12 @@ class CustomerQrisPaymentTest extends TestCase
     public function test_pesanan_dengan_metode_qris_diarahkan_ke_panel_qr(): void
     {
         $this->siapkanMidtrans();
+        $this->masukPelanggan();
         $produk = $this->buatMenu();
         $this->post(route('pelanggan.keranjang.tambah', $produk->id_produk));
 
         $res = $this->post(route('pelanggan.checkout.simpan'), [
             'tipe_pesanan' => 'takeaway',
-            'nama_pemesan' => 'Budi Tamu',
             'metode' => 'qris',
         ]);
 
@@ -241,12 +266,12 @@ class CustomerQrisPaymentTest extends TestCase
     public function test_pesanan_dengan_metode_tunai_tetap_di_kasir(): void
     {
         $this->siapkanMidtrans();
+        $this->masukPelanggan();
         $produk = $this->buatMenu();
         $this->post(route('pelanggan.keranjang.tambah', $produk->id_produk));
 
         $res = $this->post(route('pelanggan.checkout.simpan'), [
             'tipe_pesanan' => 'takeaway',
-            'nama_pemesan' => 'Budi Tamu',
             'metode' => 'tunai',
         ]);
 
@@ -261,10 +286,14 @@ class CustomerQrisPaymentTest extends TestCase
 
     public function test_halaman_status_menampilkan_panel_qris(): void
     {
-        $pesanan = $this->pesananTamu();
+        $pengguna = $this->masukPelanggan();
+        $pesanan = Pesanan::factory()->create([
+            'id_pengguna' => $pengguna->id_pengguna,
+            'status_pesanan' => 'baru',
+            'total_harga' => 25000,
+        ]);
 
-        $this->withSession(['tamu_pesanan' => [$pesanan->id_pesanan]])
-            ->get(route('pelanggan.status', $pesanan->nomor_pesanan))
+        $this->get(route('pelanggan.status', $pesanan->nomor_pesanan))
             ->assertOk()
             ->assertSee('Tampilkan Kode QRIS')
             ->assertSee('GoPay, ShopeePay, DANA, OVO, LinkAja', false);

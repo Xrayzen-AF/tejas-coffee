@@ -56,8 +56,8 @@
   @media (max-width: 639.98px) {
     .mnu-tambah { width: 38px; height: 38px; }
   }
-  .mnu-thumb { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; background: #241B17; padding: 10px; overflow: hidden; border-radius: 0; }
-  .mnu-thumb img { width: 100%; height: 100%; object-fit: contain; transition: transform .25s ease; cursor: zoom-in; }
+  .mnu-thumb { position: relative; display: block; width: 100%; }
+  .mnu-thumb img { transition: transform .25s ease; cursor: zoom-in; }
   .mnu-thumb:hover img { transform: scale(1.05); }
 
   /* ——— Modal detail produk ——— */
@@ -93,14 +93,22 @@
                     <h1 class="grotesk text-xl sm:text-2xl font-bold text-[#F1DFD8]">Mau ngopi apa, {{ $namaDepan }}?</h1>
                 </div>
             </div>
-            <a href="{{ route('pelanggan.keranjang.index') }}"
-               class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#271D19] border border-[#3D322E] text-[#F1DFD8]"
-               title="Keranjang">
-                <i data-lucide="shopping-basket" class="h-5 w-5"></i>
-                @if ($jumlahItemKeranjang > 0)
-                    <span class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#D97706] px-1 text-[10px] font-bold text-[#241708]">{{ $jumlahItemKeranjang }}</span>
-                @endif
-            </a>
+            @auth
+                <a href="{{ route('pelanggan.keranjang.index') }}"
+                   class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-[#271D19] border border-[#3D322E] text-[#F1DFD8]"
+                   title="Keranjang">
+                    <i data-lucide="shopping-basket" class="h-5 w-5"></i>
+                    @if ($jumlahItemKeranjang > 0)
+                        <span class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#D97706] px-1 text-[10px] font-bold text-[#241708]">{{ $jumlahItemKeranjang }}</span>
+                    @endif
+                </a>
+            @else
+                {{-- Tamu tanpa akun hanya boleh melihat menu; untuk memesan wajib masuk. --}}
+                <a href="{{ route('login') }}"
+                   class="flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-md bg-[#D97706] px-3.5 text-[13px] font-bold text-[#241708] transition hover:bg-[#B56100]">
+                    <i data-lucide="log-in" class="h-4 w-4"></i> Masuk
+                </a>
+            @endauth
         </div>
 
         {{-- ═══ PENCARIAN ═══ --}}
@@ -139,6 +147,13 @@
             {{ $produk->count() }} menu{{ $kategoriAktif ? ' • ' . $kategoriAktif : '' }}{{ $cari !== '' ? ' • "' . $cari . '"' : '' }}
         </p>
 
+        @guest
+            <div class="menu-card mt-3 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                <p class="text-xs text-[#B8A8A1]">Anda melihat menu sebagai tamu. Masuk untuk memesan dan memakai meja.</p>
+                <a href="{{ route('login') }}" class="text-xs font-bold text-[#F59E0B] hover:underline">Masuk sekarang &rarr;</a>
+            </div>
+        @endguest
+
         {{-- ═══ GRID MENU ═══ --}}
         <div class="menu-grid mt-3">
             @forelse ($produk as $p)
@@ -152,15 +167,18 @@
                             data-deskripsi="{{ $p->deskripsi ?? '' }}"
                             data-harga="Rp {{ number_format($p->harga, 0, ',', '.') }}"
                             data-gambar="{{ $p->url_gambar ?? '' }}"
-                            data-pesan="{{ $habis ? '' : route('pelanggan.menu.kustom', $p->id_produk) }}"
+                            data-pesan="{{ $habis ? '' : ($user ? route('pelanggan.menu.kustom', $p->id_produk) : route('login')) }}"
                             aria-label="Lihat detail {{ $p->nama_produk }}">
-                        @if ($p->url_gambar)
-                            <img src="{{ $p->url_gambar }}" alt="{{ $p->nama_produk }}">
-                        @else
-                            <span class="flex h-full w-full items-center justify-center text-[#9D8E87]">
-                                <i data-lucide="coffee" class="h-10 w-10"></i>
-                            </span>
-                        @endif
+                        <div class="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[#14100d] p-3">
+                            @if ($p->url_gambar)
+                                <img src="{{ $p->url_gambar }}" alt="{{ $p->nama_produk }}"
+                                     class="h-full w-full object-contain transition-transform duration-300 hover:scale-105" loading="lazy">
+                            @else
+                                <span class="flex h-full w-full items-center justify-center text-[#9D8E87]">
+                                    <i data-lucide="coffee" class="h-10 w-10"></i>
+                                </span>
+                            @endif
+                        </div>
 
                         <span class="pointer-events-none absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#271D19]/90 text-[#F87171] shadow" title="Favorit pelanggan">
                             <i data-lucide="heart" class="h-4 w-4 fill-current"></i>
@@ -180,9 +198,9 @@
                         <div class="mt-3 flex items-center justify-between">
                             <span class="grotesk text-sm sm:text-base font-bold text-[#F1DFD8]">Rp {{ number_format($p->harga, 0, ',', '.') }}</span>
                             @if (! $habis)
-                                <a href="{{ route('pelanggan.menu.kustom', $p->id_produk) }}"
-                                   class="mnu-tambah flex h-8 w-8 items-center justify-center rounded-md bg-[#D97706] text-[#241708] transition hover:bg-[#B56100]" title="Atur &amp; tambah">
-                                    <i data-lucide="plus" class="h-4 w-4"></i>
+                                <a href="{{ $user ? route('pelanggan.menu.kustom', $p->id_produk) : route('login') }}"
+                                   class="mnu-tambah flex h-8 w-8 items-center justify-center rounded-md bg-[#D97706] text-[#241708] transition hover:bg-[#B56100]" title="{{ $user ? 'Atur & tambah' : 'Masuk untuk memesan' }}">
+                                    <i data-lucide="{{ $user ? 'plus' : 'log-in' }}" class="h-4 w-4"></i>
                                 </a>
                             @else
                                 <span class="rounded bg-[#352A22] px-2 py-1 text-[10px] font-bold text-[#9D8E87]">HABIS</span>
@@ -218,7 +236,7 @@
 
 {{-- ═══ MODAL DETAIL PRODUK ═══ --}}
 <div id="produk-modal" class="produk-modal" aria-hidden="true">
-    <div class="produk-modal-panel relative" role="dialog" aria-modal="true" aria-labelledby="produk-modal-title">
+    <div class="produk-modal-panel relative" role="dialog" aria-modal="true" aria-labelledby="produk-modal-title" data-lenis-prevent>
         <button type="button" class="produk-modal-x" data-tutup-produk aria-label="Tutup">&times;</button>
         <div class="produk-modal-gambar">
             <img id="produk-modal-gambar" src="" alt="">

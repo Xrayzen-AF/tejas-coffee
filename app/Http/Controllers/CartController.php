@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Admin\SettingController;
 use App\Models\Kategori;
 use App\Models\Meja;
+use App\Models\OpsiGrup;
 use App\Models\Pelanggan;
 use App\Models\Pesanan;
 use App\Models\Produk;
@@ -14,6 +15,7 @@ use App\Services\MejaKodeService;
 use App\Services\MidtransService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -60,37 +62,77 @@ class CartController extends Controller
     }
 
     /**
-     * Opsi kustomisasi menu (harga delta dalam rupiah) sesuai Figma
-     * ORDER_CUSTOMIZATION: ukuran, susu, es, manis (pilih 1) + add-on (bisa >1).
+     * Grup kustomisasi aktif untuk sebuah produk.
+     *
+     * Hanya grup yang dicentang admin untuk produk ini yang dipakai. Produk
+     * tanpa centang berarti memang tanpa kustomisasi — sengaja TIDAK ada
+     * fallback ke semua grup, supaya melepas semua centang benar-benar
+     * tersimpan (sebelumnya fallback ini membuat opsi muncul lagi).
      */
-    public const OPSI_UKURAN = [
-        'regular' => ['label' => 'Regular 350 ml', 'delta' => 0],
-        'large' => ['label' => 'Large 500 ml', 'delta' => 6000],
-    ];
+    public static function grupUntukProduk(Produk $produk)
+    {
+        $muatItem = fn ($q) => $q->where('aktif', true)->orderBy('urutan')->orderBy('id_opsi_item');
 
-    public const OPSI_SUSU = [
-        'fresh' => ['label' => 'Fresh Milk', 'delta' => 0],
-        'oat' => ['label' => 'Oat Milk', 'delta' => 8000],
-        'almond' => ['label' => 'Almond Milk', 'delta' => 8000],
-        'skim' => ['label' => 'Skim Milk', 'delta' => 0],
-    ];
+        return $produk->opsiGrup()
+            ->where('opsi_grup.aktif', true)
+            ->with(['items' => $muatItem])
+            ->orderBy('opsi_grup.urutan')
+            ->get()
+            ->filter(fn (OpsiGrup $g) => $g->items->isNotEmpty())
+            ->values();
+    }
 
-    public const OPSI_ES = [
-        'normal' => ['label' => 'Normal Ice', 'delta' => 0],
-        'less' => ['label' => 'Less Ice (50%)', 'delta' => 0],
-        'no' => ['label' => 'No Ice', 'delta' => 0],
-    ];
+    /**
+     * Cocokkan pilihan form dengan definisi grup di database.
+     * Mendukung format baru `opsi[kode_grup]` sekaligus format lama
+     * (`ukuran=large`, `addon[]=shot`) agar keranjang lama tetap valid.
+     *
+     * @param  Collection<int, OpsiGrup>  $grup
+     * @return array{opsi: array<string, string|array<int, string>>, tambahan: float, label: array<int, string>, kustom: bool}
+     */
+    public static function bacaOpsi($grup, array $input): array
+    {
+        $opsi = [];
+        $tambahan = 0.0;
+        $label = [];
 
-    public const OPSI_MANIS = [
-        'normal' => ['label' => 'Normal (100%)', 'delta' => 0],
-        'less' => ['label' => 'Less (50%)', 'delta' => 0],
-        'no' => ['label' => 'No Sugar (0%)', 'delta' => 0],
-    ];
+        foreach ($grup as $g) {
+            $nilai = $input[$g->kode] ?? null;
+            $kodeValid = $g->items->pluck('kode')->all();
 
-    public const OPSI_ADDON = [
-        'shot' => ['label' => 'Extra Espresso Shot', 'delta' => 7000],
-        'foam' => ['label' => 'Vanilla Sweet Cream Foam', 'delta' => 6000],
-    ];
+            if ($g->tipe === 'pilih_banyak') {
+                $dipilih = collect((array) $nilai)
+                    ->filter(fn ($v) => is_string($v) && in_array($v, $kodeValid, true))
+                    ->unique()
+                    ->values()
+                    ->all();
+            } else {
+                $dipilih = is_string($nilai) && in_array($nilai, $kodeValid, true)
+                    ? $nilai
+                    : ($g->items->firstWhere('is_default', true)?->kode ?? $g->items->first()->kode);
+            }
+
+            $opsi[$g->kode] = $dipilih;
+
+            $terpilih = $g->items->whereIn('kode', (array) $dipilih);
+            $tambahan += (float) $terpilih->sum('delta_harga');
+
+            foreach ($terpilih as $item) {
+                if ($item->is_default) {
+                    continue;
+                }
+
+                $label[] = ($g->tipe === 'pilih_banyak' ? '+' : '').$item->label;
+            }
+        }
+
+        return [
+            'opsi' => $opsi,
+            'tambahan' => $tambahan,
+            'label' => $label,
+            'kustom' => $label !== [],
+        ];
+    }
 
     /** Halaman kustomisasi satu produk (Langkah 1/3). Mode ubah via ?key=. */
     public function kustom(Request $request, Produk $produk)
@@ -115,47 +157,10 @@ class CartController extends Controller
         return view('pelanggan.kustom', [
             'produk' => $produk->loadMissing('kategori:id_kategori,nama_kategori'),
             'jumlahItemKeranjang' => $this->count(),
+            'grup' => self::grupUntukProduk($produk),
             'editKey' => $editKey,
             'editBaris' => $editBaris,
         ]);
-    }
-
-    /** Harga satuan = harga dasar + delta opsi (dihitung ulang di server). */
-    public static function hargaSatuan(float $dasar, array $opsi): float
-    {
-        $delta = (self::OPSI_UKURAN[$opsi['ukuran']]['delta'] ?? 0)
-            + (self::OPSI_SUSU[$opsi['susu']]['delta'] ?? 0);
-        foreach ($opsi['addon'] ?? [] as $a) {
-            $delta += self::OPSI_ADDON[$a]['delta'] ?? 0;
-        }
-
-        return $dasar + $delta;
-    }
-
-    /** Ringkasan opsi untuk struk/barista, mis. "Large • Oat Milk • Less Ice". */
-    public static function ringkasOpsi(array $opsi, ?string $catatan = null): string
-    {
-        $bagian = [];
-        if (($opsi['ukuran'] ?? 'regular') !== 'regular') {
-            $bagian[] = self::OPSI_UKURAN[$opsi['ukuran']]['label'];
-        }
-        if (($opsi['susu'] ?? 'fresh') !== 'fresh') {
-            $bagian[] = self::OPSI_SUSU[$opsi['susu']]['label'];
-        }
-        if (($opsi['es'] ?? 'normal') !== 'normal') {
-            $bagian[] = self::OPSI_ES[$opsi['es']]['label'];
-        }
-        if (($opsi['manis'] ?? 'normal') !== 'normal') {
-            $bagian[] = self::OPSI_MANIS[$opsi['manis']]['label'];
-        }
-        foreach ($opsi['addon'] ?? [] as $a) {
-            $bagian[] = '+'.self::OPSI_ADDON[$a]['label'];
-        }
-        if ($catatan) {
-            $bagian[] = '"'.$catatan.'"';
-        }
-
-        return implode(' • ', $bagian);
     }
 
     /** Tambah item ke keranjang (session), dukung varian kustomisasi. */
@@ -163,12 +168,7 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'jumlah' => ['nullable', 'integer', 'min:1', 'max:20'],
-            'ukuran' => ['nullable', 'string', 'in:regular,large'],
-            'susu' => ['nullable', 'string', 'in:fresh,oat,almond,skim'],
-            'es' => ['nullable', 'string', 'in:normal,less,no'],
-            'manis' => ['nullable', 'string', 'in:normal,less,no'],
-            'addon' => ['nullable', 'array', 'max:2'],
-            'addon.*' => ['string', 'in:shot,foam'],
+            'opsi' => ['nullable', 'array'],
             'catatan' => ['nullable', 'string', 'max:100'],
             'ganti_key' => ['nullable', 'string', 'max:64'],
         ]);
@@ -179,17 +179,23 @@ class CartController extends Controller
             return back()->with('error', 'Menu '.$produk->nama_produk.' sedang habis.');
         }
 
-        $opsi = [
-            'ukuran' => $validated['ukuran'] ?? 'regular',
-            'susu' => $validated['susu'] ?? 'fresh',
-            'es' => $validated['es'] ?? 'normal',
-            'manis' => $validated['manis'] ?? 'normal',
-            'addon' => array_values(array_unique($validated['addon'] ?? [])),
-        ];
+        // Kumpulkan pilihan: format baru opsi[...] didahulukan, format lama
+        // (ukuran/susu/es/manis/addon) tetap diterima untuk kompatibilitas.
+        $input = $validated['opsi'] ?? [];
+        foreach (['ukuran', 'susu', 'es', 'manis', 'addon'] as $kodeLama) {
+            if (! array_key_exists($kodeLama, $input) && $request->has($kodeLama)) {
+                $input[$kodeLama] = $request->input($kodeLama);
+            }
+        }
+
+        $hasil = self::bacaOpsi(self::grupUntukProduk($produk), $input);
+        $opsi = $hasil['opsi'];
         $catatan = trim($validated['catatan'] ?? '');
-        $kustom = $opsi['ukuran'] !== 'regular' || $opsi['susu'] !== 'fresh'
-            || $opsi['es'] !== 'normal' || $opsi['manis'] !== 'normal'
-            || ! empty($opsi['addon']) || $catatan !== '';
+        $kustom = $hasil['kustom'] || $catatan !== '';
+        $opsiText = implode(' • ', array_merge(
+            $hasil['label'],
+            $catatan !== '' ? ['"'.$catatan.'"'] : [],
+        ));
 
         // Varian berbeda = baris keranjang berbeda; tanpa kustom = gabung per produk.
         $key = (string) $produk->id_produk;
@@ -224,10 +230,10 @@ class CartController extends Controller
             'sku' => $produk->kode_produk,
             'kategori' => $produk->kategori->nama_kategori ?? null,
             'gambar' => $produk->url_gambar,
-            'harga' => self::hargaSatuan((float) $produk->harga, $opsi),
+            'harga' => (float) $produk->harga + $hasil['tambahan'],
             'jumlah' => ($keranjang[$key]['jumlah'] ?? 0) + $jumlah,
             'opsi' => $kustom ? $opsi : null,
-            'opsi_text' => $kustom ? self::ringkasOpsi($opsi, $catatan !== '' ? $catatan : null) : null,
+            'opsi_text' => $kustom ? $opsiText : null,
             'catatan' => $catatan !== '' ? $catatan : null,
         ];
 
@@ -314,14 +320,14 @@ class CartController extends Controller
             ->limit(3)
             ->get();
 
-        // Meja tidak dipilih lagi oleh pelanggan: dipakai otomatis dari sesi
-        // check-in QR yang masih aktif (bila ada).
-        $mejaAktif = self::nomorMejaAktif($member) ?? $this->nomorMejaSesi($request);
-
         // Meja dari scan QR / PIN kasir / reservasi aktif bersifat terkunci:
         // pelanggan tidak boleh memilih meja lain lagi.
         $mejaScan = $this->mejaDariScan($request, $member);
         $idMejaMilik = $mejaScan?->id_meja ?? session('checkout_meja');
+
+        // Meja tidak dipilih lagi oleh pelanggan: dipakai otomatis dari meja
+        // yang sudah terikat ke sesi ini (bila ada).
+        $mejaAktif = $mejaScan?->nomor_meja;
 
         return view('pelanggan.keranjang', [
             'keranjang' => $items,
@@ -461,13 +467,18 @@ class CartController extends Controller
     /**
      * Meja yang sudah terikat ke sesi ini lewat scan QR, PIN kasir, atau
      * reservasi aktif. Bila ada, pemilihan meja dikunci ke meja tersebut.
+     *
+     * Hasil scan + PIN di perangkat ini didahulukan karena itu bukti
+     * kehadiran paling baru: reservasi lama member di meja lain (mis. meja
+     * sebelumnya yang belum dilepas) tidak boleh menang dan mengembalikan
+     * pesanan ke meja yang salah.
      */
     private function mejaDariScan(Request $request, ?Pelanggan $member): ?Meja
     {
-        $id = $member ? self::idMejaAktif($member) : null;
+        $id = $this->idMejaSesi($request);
 
-        if (! $id) {
-            $id = $this->idMejaSesi($request);
+        if (! $id && $member) {
+            $id = self::idMejaAktif($member);
         }
 
         return $id ? Meja::find($id) : null;
@@ -551,7 +562,7 @@ class CartController extends Controller
             'metodeAwal' => old('metode', $this->midtrans->isConfigured() ? 'qris' : 'tunai'),
             'totalKeranjang' => self::ringkasan($items, session('voucher_kode'), (bool) session('tukar_poin'), $member)['total'],
             'ringkasan' => self::ringkasan($items, session('voucher_kode'), (bool) session('tukar_poin'), $member),
-            'mejaAktif' => self::nomorMejaAktif($member) ?? $this->nomorMejaSesi($request),
+            'mejaAktif' => $mejaScan?->nomor_meja,
             'mejaTersedia' => $mejaScan
                 ? collect()
                 : $this->daftarMeja(session('checkout_meja')),
@@ -626,8 +637,8 @@ class CartController extends Controller
             $idMeja = $mejaScan?->id_meja ?? $validated['id_meja'] ?? session('checkout_meja');
 
             if (! $idMeja) {
-                // Member: sesi check-in QR miliknya. Tamu: sesi kode meja dari kasir.
-                $idMeja = $pelanggan ? self::idMejaAktif($pelanggan) : $this->idMejaSesi($request);
+                // Sesi kode meja (scan/PIN) dulu, baru reservasi aktif member.
+                $idMeja = $this->idMejaSesi($request) ?? self::idMejaAktif($pelanggan);
             }
         }
 
@@ -748,20 +759,6 @@ class CartController extends Controller
         );
     }
 
-    /** Nomor meja dari sesi check-in QR aktif milik member (null bila belum). */
-    private static function nomorMejaAktif(?Pelanggan $member): ?string
-    {
-        if (! $member) {
-            return null;
-        }
-
-        return ReservasiMeja::aktif()
-            ->with('meja:id_meja,nomor_meja')
-            ->where('id_pelanggan', $member->id_pelanggan)
-            ->latest('id_reservasi')
-            ->first()?->meja?->nomor_meja;
-    }
-
     /**
      * Charge QRIS yang diprakarsai pelanggan sendiri (member maupun tamu)
      * dari halaman status pesanan. Otorisasi memakai sesi pemilik pesanan,
@@ -816,14 +813,6 @@ class CartController extends Controller
             'reused' => false,
             'payment' => $payment,
         ]);
-    }
-
-    /** Nomor meja dari sesi kode meja (akun ataupun tamu tanpa akun). */
-    private function nomorMejaSesi(Request $request): ?string
-    {
-        $idMeja = $this->idMejaSesi($request);
-
-        return $idMeja ? Meja::where('id_meja', $idMeja)->value('nomor_meja') : null;
     }
 
     /** id_meja dari sesi kode meja (akun ataupun tamu tanpa akun). */

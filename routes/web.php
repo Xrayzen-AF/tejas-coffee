@@ -3,10 +3,12 @@
 use App\Http\Controllers\Admin\AdminEmployeeController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\InventoryController;
+use App\Http\Controllers\Admin\KustomisasiController;
 use App\Http\Controllers\Admin\MasterKategoriController;
 use App\Http\Controllers\Admin\MasterMejaController;
 use App\Http\Controllers\Admin\MasterProdukController;
 use App\Http\Controllers\Admin\MasterPromoController;
+use App\Http\Controllers\Admin\NotifikasiController;
 use App\Http\Controllers\Admin\OrderManagementController;
 use App\Http\Controllers\Admin\OverviewController;
 use App\Http\Controllers\Admin\SalesController;
@@ -80,6 +82,11 @@ Route::get('/meja/{meja:qr_token}/pin', [MejaQrController::class, 'pinStatus'])
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [OverviewController::class, 'index'])->name('dashboard');
 
+    // Lonceng notifikasi stok habis (dipolling panel admin).
+    Route::get('/notifikasi', [NotifikasiController::class, 'poll'])->name('notifikasi.poll');
+    Route::patch('/notifikasi/{notifikasi}/baca', [NotifikasiController::class, 'baca'])->name('notifikasi.baca');
+    Route::post('/notifikasi/baca-semua', [NotifikasiController::class, 'bacaSemua'])->name('notifikasi.baca-semua');
+
     // CRUD akun pegawai (Kasir & Barista) — STRICT RULE: admin only
     Route::resource('employees', AdminEmployeeController::class)
         ->except(['show'])
@@ -134,6 +141,15 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
         Route::post('/meja', [MasterMejaController::class, 'store'])->name('meja.store');
         Route::put('/meja/{meja}', [MasterMejaController::class, 'update'])->name('meja.update');
         Route::delete('/meja/{meja}', [MasterMejaController::class, 'destroy'])->name('meja.destroy');
+
+        // Grup opsi kustomisasi menu + pilihannya, lalu pemasangan per produk.
+        Route::get('/kustomisasi', [KustomisasiController::class, 'index'])->name('kustomisasi.index');
+        Route::post('/kustomisasi', [KustomisasiController::class, 'storeGrup'])->name('kustomisasi.store');
+        Route::put('/kustomisasi/{grup}', [KustomisasiController::class, 'updateGrup'])->name('kustomisasi.update');
+        Route::delete('/kustomisasi/{grup}', [KustomisasiController::class, 'destroyGrup'])->name('kustomisasi.destroy');
+        Route::post('/kustomisasi/{grup}/item', [KustomisasiController::class, 'storeItem'])->name('kustomisasi.item.store');
+        Route::put('/kustomisasi/item/{item}', [KustomisasiController::class, 'updateItem'])->name('kustomisasi.item.update');
+        Route::delete('/kustomisasi/item/{item}', [KustomisasiController::class, 'destroyItem'])->name('kustomisasi.item.destroy');
 
         Route::get('/promo', [MasterPromoController::class, 'index'])->name('promo.index');
         Route::post('/promo', [MasterPromoController::class, 'store'])->name('promo.store');
@@ -190,11 +206,20 @@ Route::middleware(['auth', 'role:pelanggan'])->prefix('pelanggan')->name('pelang
     Route::get('/meja/pindai', [MejaQrController::class, 'pindai'])->name('meja.pindai');
 });
 
-// Alur pesan pelanggan: member login maupun tamu tanpa akun.
-// Geofence hanya menahan akun pelanggan (middleware meloloskan tamu);
-// pesanan dine-in tetap wajib punya meja dari sesi QR/kode kasir.
+// Tamu tanpa akun HANYA boleh melihat daftar menu. Katalog sengaja tetap
+// publik agar orang bisa melihat menu sebelum mendaftar/masuk.
 Route::middleware(['geofence'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
     Route::get('/menu', [CartController::class, 'menu'])->name('menu');
+    // Status meja untuk pemilih meja di halaman scan QR (masih boleh dilihat
+    // tanpa akun karena hanya read-only, tanpa detail pesanan).
+    Route::get('/meja/status', [DashboardController::class, 'mejaStatusPelanggan'])->name('meja.status');
+});
+
+// Alur pesan wajib akun: kustomisasi, keranjang, checkout, dan status pesanan
+// tidak lagi bisa dipakai tamu (sebelumnya tamu boleh memesan tanpa akun).
+// Geofence hanya menahan akun pelanggan; pesanan dine-in tetap wajib punya
+// meja dari sesi QR/kode kasir.
+Route::middleware(['auth', 'geofence'])->prefix('pelanggan')->name('pelanggan.')->group(function () {
     Route::get('/menu/{produk}/kustom', [CartController::class, 'kustom'])->name('menu.kustom');
     Route::post('/keranjang/tambah/{produk}', [CartController::class, 'tambah'])->name('keranjang.tambah');
     Route::post('/keranjang/update/{key}', [CartController::class, 'update'])->name('keranjang.update');
@@ -206,8 +231,6 @@ Route::middleware(['geofence'])->prefix('pelanggan')->name('pelanggan.')->group(
     Route::post('/keranjang/batal', [CartController::class, 'batalKeranjang'])->name('keranjang.batal');
     Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout');
     Route::post('/checkout', [CartController::class, 'simpanPesanan'])->name('checkout.simpan');
-    // Status meja untuk pemilih meja: terbuka sebelum login (tamu).
-    Route::get('/meja/status', [DashboardController::class, 'mejaStatusPelanggan'])->name('meja.status');
     Route::get('/pesanan/{nomorPesanan}', [CartController::class, 'status'])->name('status');
     // Polling status untuk progres real-time (pemilik akun atau sesi tamu).
     Route::get('/pesanan/{pesanan}/status-live', [CartController::class, 'statusLive'])->name('pesanan.status-live');

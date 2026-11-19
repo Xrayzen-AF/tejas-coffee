@@ -39,6 +39,16 @@ class MejaQrController extends Controller
 
         $state = $this->mejaQr->status($meja, $request->user(), $idTerverifikasi);
 
+        // Sesi kode kasir hanya boleh diakui untuk meja yang benar-benar
+        // diverifikasi. Tanpa pengecekan ini, pelanggan yang masih memegang
+        // sesi meja lama melihat "sudah terverifikasi" di meja baru padahal
+        // PIN meja itu belum pernah dimasukkan — pesanan lalu jatuh ke meja lama.
+        $sesiMeja = $this->mejaKode->mejaTerverifikasi(
+            $request,
+            $request->user() ? (int) $request->user()->getKey() : 0,
+        );
+        $sesiMeja = $sesiMeja !== null && (int) $sesiMeja === (int) $meja->id_meja ? $sesiMeja : null;
+
         return view('pelanggan.meja-scan', [
             'meja' => $meja,
             'state' => $state,
@@ -46,9 +56,13 @@ class MejaQrController extends Controller
             // Sesi tamu yang lolos verifikasi kode (bukan lewat akun login).
             'terverifikasi' => $state['kode'] === MejaQrService::KODE_MILIK_SENDIRI
                 && ! $request->user(),
-            // Sisa masa berlaku bukti kehadiran via kode kasir (null bila belum).
-            'kodeKasirDetik' => $request->user()
-                ? $this->mejaKode->sisaSesi($request, (int) $request->user()->getKey())
+            // Sisa masa berlaku bukti kehadiran via kode kasir untuk meja ini
+            // (null bila belum verifikasi atau sesinya milik meja lain).
+            'kodeKasirDetik' => $sesiMeja !== null
+                ? $this->mejaKode->sisaSesi(
+                    $request,
+                    $request->user() ? (int) $request->user()->getKey() : 0,
+                )
                 : null,
         ]);
     }

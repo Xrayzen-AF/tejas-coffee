@@ -40,6 +40,8 @@
 @endphp
 
 @section('content')
+@include('kasir._notif-meja')
+
 <style>
   .pos { font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #1E1511; color: #F1DFD8; }
   .pos .grotesk { font-family: 'Lora', ui-serif, Georgia, serif; }
@@ -342,8 +344,8 @@
             <div class="mt-4 grid grid-cols-2 gap-4 xl:grid-cols-3">
                 @forelse ($produk as $p)
                     @php $habis = ! $p->status_tersedia || $p->stok <= 0; @endphp
-                    <div class="pos-card overflow-hidden">
-                        <div class="relative w-full items-center justify-center bg-[#241B17] overflow-hidden p-2">
+                    <div class="pos-card flex flex-col overflow-hidden">
+                        <div class="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[#14100d] p-2">
                             @if ($p->url_gambar)
                                 <img src="{{ $p->url_gambar }}" alt="{{ $p->nama_produk }}" class="h-full w-full object-contain transition-transform duration-200 hover:scale-105">
                             @else
@@ -355,9 +357,11 @@
                                 <span class="absolute left-2 top-2 rounded bg-[#271D19]/90 px-2 py-0.5 text-[11px] font-medium text-[#B8A8A1]">Stok {{ $p->stok }}</span>
                             @endif
                         </div>
-                        <div class="p-3.5">
+                        <div class="flex flex-1 flex-col justify-between p-3.5">
+                            <div>
                             <p class="text-[11px] font-medium uppercase tracking-wide text-[#B8A8A1]">{{ $p->kategori->nama_kategori ?? 'House Blend' }}</p>
                             <h3 class="mt-0.5 line-clamp-2 min-h-[40px] text-sm font-medium leading-snug text-[#F1DFD8]">{{ $p->nama_produk }}</h3>
+                            </div>
                             <div class="mt-2 flex items-center justify-between">
                                 <span class="text-sm font-semibold text-[#F1DFD8]">{{ $idrK($p->harga) }}</span>
                                 <form method="POST" action="{{ route('kasir.ticket.tambah', $p->id_produk) }}">
@@ -645,11 +649,10 @@
                     @else
                         <div class="mt-3 rounded-lg bg-[#2F231D] py-3 text-center text-sm font-semibold text-[#F1DFD8]">Lunas ✓ — {{ $idrFull($bayar->total_bayar) }}@if ((float) $bayar->kembalian > 0) (kembali {{ $idrFull($bayar->kembalian) }})@endif</div>
                     @endif
-                    <a href="{{ route('struk.show', ['pesanan' => $t->id_pesanan, 'print' => 1]) }}"
-                       target="_blank" rel="noopener"
+                    <button type="button" data-struk-url="{{ route('struk.show', ['pesanan' => $t->id_pesanan, 'print' => 1]) }}"
                        class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-[#3D322E] bg-[#271D19] px-3 py-3 text-[13px] font-semibold text-[#F1DFD8] transition hover:bg-[#2F231D]">
                         <i data-lucide="printer" class="h-4 w-4"></i> Cetak Struk (80 mm)
-                    </a>
+                    </button>
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         @if ($t->status_pesanan !== 'selesai' && $t->status_pesanan !== 'dibatalkan')
                             @if ($t->status_pesanan === 'baru')
@@ -851,11 +854,10 @@
                         </div>
                         <div class="flex shrink-0 items-center gap-3">
                             <span class="grotesk text-[13px] font-bold text-[#F1DFD8]">{{ $idrFull($p->total_harga) }}</span>
-                            <a href="{{ route('struk.show', ['pesanan' => $p->id_pesanan, 'print' => 1]) }}"
-                               target="_blank" rel="noopener"
+                            <button type="button" data-struk-url="{{ route('struk.show', ['pesanan' => $p->id_pesanan, 'print' => 1]) }}"
                                class="flex items-center gap-1.5 rounded-md border border-[#3D322E] bg-[#271D19] px-3 py-2 text-[12px] font-semibold text-[#F1DFD8] transition hover:bg-[#2F231D] hover:border-[#554336]">
                                 <i data-lucide="printer" class="h-3.5 w-3.5"></i> Cetak struk
-                            </a>
+                            </button>
                         </div>
                     </div>
                 @empty
@@ -883,7 +885,7 @@
 
     {{-- ═══ KALKULATOR TUNAI ═══ --}}
     <div id="cash-calculator" class="calc-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="calc-title">
-        <div class="calc-sheet" role="document">
+        <div class="calc-sheet" role="document" data-lenis-prevent>
             <div class="flex items-start justify-between gap-3 border-b border-[#3D322E] px-5 py-4">
                 <div>
                     <p class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#D97706]">Pembayaran tunai</p>
@@ -952,7 +954,7 @@
 
     {{-- ═══ MIDTRANS: QRIS ═══ --}}
     <div id="midtrans-modal" class="pay-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="midtrans-title">
-        <div class="pay-sheet" role="document">
+        <div class="pay-sheet" role="document" data-lenis-prevent>
             <div class="flex items-start justify-between gap-3 border-b border-[#3D322E] px-5 py-4">
                 <div>
                     <p class="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#D97706]">Pembayaran QRIS</p>

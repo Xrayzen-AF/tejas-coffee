@@ -1,0 +1,64 @@
+/* ==========================================================================
+   Modal bersama (<dialog class="app-modal">)
+   Dipakai semua halaman admin & pelanggan. Satu sumber aturan, supaya ukuran,
+   backdrop, dan scroll tidak disalin ke tiap view.
+   ========================================================================== */
+
+dialog.app-modal {
+    width: min(var(--app-modal-width, 640px), calc(100vw - 28px));
+    max-height: min(88dvh, 900px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--border-color, #3D322E);
+    border-radius: var(--radius-overlay, 12px);
+    background: var(--bg-elevated, #271D19);
+    color: var(--text-main, #F1DFD8);
+    box-shadow: 0 24px 60px -24px rgba(0, 0, 0, .7), 0 40px 90px -40px rgba(0, 0, 0, .85);
+    overflow: hidden;
+}
+
+dialog.app-modal::backdrop {
+    background: rgba(12, 9, 7, .72);
+    backdrop-filter: blur(2px);
+}
+
+.app-modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color, #3D322E);
+    background: var(--bg-subtle, #221A15);
+}
+
+.app-modal-head h3 { font-size: 13.5px; letter-spacing: .02em; }
+
+.app-modal-sub { margin-top: 3px; font-size: 11px; color: var(--text-muted, #B8A8A1); }
+
+.app-modal-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    border: 1px solid var(--border-color, #3D322E);
+    border-radius: var(--radius-control, 6px);
+    background: transparent;
+    color: var(--text-muted, #B8A8A1);
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+}
+
+.app-modal-x:hover { color: var(--text-main, #F1DFD8); border-color: var(--border-strong, #554336); }
+
+.app-modal-body {
+    padding: 16px 18px 18px;
+    max-height: calc(min(88dvh, 900px) - 63px);
+    overflow-y: auto;
+}
+
+/* Kerangka form di dalam modal: dua kolom rapat lalu melebar. */
+.app-modal-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.app-modal-form > .full { grid-column: 1 / -1; }

@@ -5,7 +5,7 @@
 @section('header-subtitle', 'Pantau semua bahan dan pesan ulang saat stok menipis')
 
 @section('header-action')
-  <button class="btn-new-ticket" onclick="document.getElementById('form-tambah').scrollIntoView({behavior:'smooth'})">
+  <button type="button" class="btn-new-ticket" data-modal-open="tambah-bahan">
     <i data-lucide="plus" size="16"></i> Tambah Bahan
   </button>
 @endsection
@@ -95,9 +95,10 @@
                     <button class="btn-sm danger" title="Hapus bahan"><i data-lucide="trash-2" size="13"></i></button>
                   </form>
                 </div>
-                <details style="margin-top:8px;">
-                  <summary style="font-size:12px;font-weight:600;cursor:pointer;color:var(--accent-caramel);">Ubah stok</summary>
-                  <form method="POST" action="{{ route('admin.inventory.update', $b) }}" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                <button type="button" class="btn-sm" data-modal-open="edit-bahan-{{ $b->id_stok_biji }}" style="margin-top:8px;width:100%;">Ubah stok</button>
+
+                <x-app-modal id="edit-bahan-{{ $b->id_stok_biji }}" title="Ubah Stok Bahan" :subtitle="$b->nama_biji" width="620px">
+                  <form method="POST" action="{{ route('admin.inventory.update', $b) }}" class="app-modal-form">
                     @csrf @method('PUT')
                     <select name="kategori" class="form-select" title="Kategori" required>
                       @foreach ($kategoriList as $k)
@@ -114,9 +115,9 @@
                     <input name="safety_cap_kg" type="number" step="0.01" value="{{ $b->safety_cap_kg }}" class="form-input" title="Target stok" required>
                     <input name="laju_konsumsi_kg_per_jam" type="number" step="0.0001" value="{{ $b->laju_konsumsi_kg_per_jam }}" class="form-input" title="Pemakaian per jam" required>
                     <input name="deskripsi" value="{{ $b->deskripsi }}" class="form-input" placeholder="Keterangan" style="grid-column:1/-1;">
-                    <button class="btn-sm primary" style="grid-column:1/-1;">Simpan</button>
+                    <button type="submit" class="btn-primary" style="grid-column:1/-1;padding:10px;">Simpan</button>
                   </form>
-                </details>
+                </x-app-modal>
               </td>
             </tr>
           @empty
@@ -127,10 +128,9 @@
     </div>
   </section>
 
-  <section class="bottom-grid">
-    <div class="card" id="form-tambah">
-      <div class="card-title-row"><div><h3>Tambah Bahan Baru</h3><p>Biji kopi, susu, sirup, kemasan, dan bahan lain</p></div></div>
-      <form method="POST" action="{{ route('admin.inventory.store') }}">
+  <section>
+    <x-app-modal id="tambah-bahan" title="Tambah Bahan" subtitle="Biji kopi, susu, sirup, kemasan, dan bahan lain" width="680px">
+      <form method="POST" action="{{ route('admin.inventory.store') }}" class="app-modal-form">
         @csrf
         <div class="form-group"><label class="form-label">Nama bahan</label><input name="nama_biji" class="form-input" placeholder="cth: Susu UHT Full Cream" required></div>
         <div class="form-grid">
@@ -158,10 +158,11 @@
           <div class="form-group"><label class="form-label">Target stok</label><input name="safety_cap_kg" type="number" step="0.01" value="25" class="form-input" required></div>
           <div class="form-group"><label class="form-label">Pemakaian per jam</label><input name="laju_konsumsi_kg_per_jam" type="number" step="0.0001" value="0.5" class="form-input" required></div>
         </div>
-        <button class="btn-primary" style="width:100%;padding:10px;">Simpan Bahan</button>
+        <button type="submit" class="btn-primary full" style="padding:10px;">Simpan Bahan</button>
       </form>
-    </div>
-    <div class="card">
+    </x-app-modal>
+
+    <div class="card" style="margin-top:20px;">
       <div class="card-title-row"><div><h3>Riwayat Pesan Ulang</h3><p>Bahan yang sudah dipesan ke supplier</p></div></div>
       <div class="top-selling-list">
         @forelse ($riwayat as $r)

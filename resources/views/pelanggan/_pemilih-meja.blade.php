@@ -56,7 +56,7 @@
             </span>
         </div>
 
-        <div class="mp-list" data-mp-list>
+        <div class="mp-list" data-mp-list data-lenis-prevent>
             @forelse ($mpList as $m)
                 @php $st = $mpStatus($m->status ?? null); @endphp
                 <button type="button" class="mp-option" role="option"

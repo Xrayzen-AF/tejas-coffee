@@ -3,16 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Kategori;
-use App\Models\Meja;
-use App\Models\Pengguna;
 use App\Models\Pesanan;
 use App\Models\Produk;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Alur pelanggan hybrid: tamu tanpa akun bisa memesan, tetap wajib
- * mengisi nama, dan hanya bisa melihat pesanannya sendiri lewat sesi.
+ * Kebijakan: pengunjung tanpa akun HANYA boleh melihat menu. Semua langkah
+ * pemesanan (kustomisasi, keranjang, checkout, status) wajib login.
  */
 class GuestOrderFlowTest extends TestCase
 {
@@ -33,104 +31,63 @@ class GuestOrderFlowTest extends TestCase
         ]);
     }
 
-    private function masukkanKeranjang(Produk $produk): void
-    {
-        $this->post(route('pelanggan.keranjang.tambah', $produk->id_produk))->assertRedirect();
-    }
-
     public function test_tamu_tanpa_akun_bisa_membuka_menu(): void
     {
         $this->buatMenu();
 
         $this->get(route('pelanggan.menu'))
             ->assertOk()
-            ->assertSee('Americano');
+            ->assertSee('Americano')
+            ->assertSee('Masuk untuk memesan', false);
     }
 
-    public function test_tamu_wajib_mengisi_nama_saat_checkout(): void
+    public function test_tamu_diarahkan_login_saat_membuka_kustomisasi(): void
     {
         $produk = $this->buatMenu();
-        $this->masukkanKeranjang($produk);
 
-        $this->post(route('pelanggan.checkout.simpan'), ['tipe_pesanan' => 'takeaway'])
-            ->assertSessionHasErrors('nama_pemesan');
-
-        $this->assertSame(0, Pesanan::count());
+        $this->get(route('pelanggan.menu.kustom', $produk->id_produk))
+            ->assertRedirect(route('login'));
     }
 
-    public function test_tamu_bisa_membuat_pesanan_dan_melihat_statusnya(): void
+    public function test_tamu_diarahkan_login_saat_menambah_ke_keranjang(): void
     {
         $produk = $this->buatMenu();
-        $this->masukkanKeranjang($produk);
+
+        $this->post(route('pelanggan.keranjang.tambah', $produk->id_produk))
+            ->assertRedirect(route('login'));
+
+        $this->assertNull(session('keranjang'));
+    }
+
+    public function test_tamu_diarahkan_login_saat_membuka_keranjang_dan_checkout(): void
+    {
+        $this->get(route('pelanggan.keranjang.index'))->assertRedirect(route('login'));
+        $this->get(route('pelanggan.checkout'))->assertRedirect(route('login'));
+    }
+
+    public function test_tamu_tidak_bisa_membuat_pesanan(): void
+    {
+        $produk = $this->buatMenu();
 
         $this->post(route('pelanggan.checkout.simpan'), [
             'tipe_pesanan' => 'takeaway',
             'nama_pemesan' => 'Budi Tamu',
-        ])->assertRedirect();
+        ])->assertRedirect(route('login'));
 
-        $pesanan = Pesanan::firstOrFail();
-        $this->assertNull($pesanan->id_pengguna);
-        $this->assertNull($pesanan->id_pelanggan);
-        $this->assertSame('Budi Tamu', $pesanan->nama_pemesan);
-        $this->assertSame(9, $produk->fresh()->stok);
-
-        $this->get(route('pelanggan.status', $pesanan->nomor_pesanan))->assertOk();
+        $this->assertSame(0, Pesanan::count());
+        $this->assertSame(10, $produk->fresh()->stok);
     }
 
-    public function test_tamu_tidak_bisa_melihat_pesanan_orang_lain(): void
+    public function test_tamu_tidak_bisa_melihat_status_pesanan(): void
     {
-        $pesananLain = Pesanan::factory()->create([
-            'id_pengguna' => Pengguna::factory()->create(['peran' => 'kasir'])->id_pengguna,
+        $pesanan = Pesanan::factory()->create([
+            'id_pengguna' => null,
+            'nama_pemesan' => 'Budi Tamu',
             'status_pesanan' => 'baru',
             'total_harga' => 18000,
         ]);
 
-        $this->get(route('pelanggan.status', $pesananLain->nomor_pesanan))->assertForbidden();
-    }
-
-    public function test_dine_in_tamu_tanpa_meja_diarahkan_scan_qr(): void
-    {
-        $produk = $this->buatMenu();
-        $this->masukkanKeranjang($produk);
-
-        $this->post(route('pelanggan.checkout.simpan'), [
-            'tipe_pesanan' => 'dine-in',
-            'nama_pemesan' => 'Budi Tamu',
-        ])->assertRedirect(route('pelanggan.meja.pindai'));
-
-        $this->assertSame(0, Pesanan::count());
-    }
-
-    public function test_dine_in_tamu_memakai_meja_dari_kode_kasir(): void
-    {
-        $produk = $this->buatMenu();
-        $meja = Meja::create(['nomor_meja' => 'M05', 'kapasitas' => 2, 'status' => 'kosong']);
-
-        $this->masukkanKeranjang($produk);
-
-        $this->withSession([
-            'meja_kode' => [
-                'id_meja' => $meja->id_meja,
-                'user_id' => 0,
-                'verified_at' => now()->timestamp,
-            ],
-        ])->get(route('pelanggan.checkout'))
-            ->assertOk()
-            ->assertSee('M05');
-
-        $this->withSession([
-            'meja_kode' => [
-                'id_meja' => $meja->id_meja,
-                'user_id' => 0,
-                'verified_at' => now()->timestamp,
-            ],
-        ])->post(route('pelanggan.checkout.simpan'), [
-            'tipe_pesanan' => 'dine-in',
-            'nama_pemesan' => 'Budi Tamu',
-        ])->assertRedirect();
-
-        $pesanan = Pesanan::firstOrFail();
-        $this->assertSame($meja->id_meja, $pesanan->id_meja);
-        $this->assertSame('Budi Tamu', $pesanan->nama_pemesan);
+        $this->get(route('pelanggan.status', $pesanan->nomor_pesanan))
+            ->assertRedirect(route('login'));
     }
 }

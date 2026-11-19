@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Kategori;
 use App\Models\Meja;
+use App\Models\OpsiGrup;
 use App\Models\Pelanggan;
 use App\Models\Pengguna;
 use App\Models\Pesanan;
@@ -23,7 +24,7 @@ class CustomerOrderFlowTest extends TestCase
     {
         $kategori = Kategori::create(['nama_kategori' => 'Kopi', 'status_aktif' => true]);
 
-        return Produk::create([
+        $produk = Produk::create([
             'id_kategori' => $kategori->id_kategori,
             'kode_produk' => 'KP-'.uniqid(),
             'nama_produk' => 'Americano',
@@ -32,6 +33,11 @@ class CustomerOrderFlowTest extends TestCase
             'stok' => $stok,
             'status_tersedia' => true,
         ]);
+
+        // Seperti produk lama hasil migrasi: memakai semua grup bawaan.
+        $produk->opsiGrup()->sync(OpsiGrup::pluck('id_opsi_grup')->all());
+
+        return $produk;
     }
 
     private function pelanggan(): Pengguna
@@ -306,7 +312,9 @@ class CustomerOrderFlowTest extends TestCase
         $this->actingAs($this->pelanggan())
             ->post(route('pelanggan.keranjang.tambah', $produk->id_produk), ['ukuran' => 'large']);
 
-        $key = array_key_first(session('keranjang'));
+        // Kunci keranjang bisa berupa int (PHP mengubah kunci numerik);
+        // field ganti_key bertipe string, jadi kirim sebagai string.
+        $key = (string) array_key_first(session('keranjang'));
 
         // Buka mode ubah: opsi lama ter-prefill.
         $this->get(route('pelanggan.menu.kustom', $produk->id_produk).'?key='.$key)

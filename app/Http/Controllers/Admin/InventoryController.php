@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LogReorder;
 use App\Models\StokBiji;
 use App\Services\Agents\InventoryAgent;
+use App\Services\NotifikasiStok;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,7 @@ class InventoryController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, NotifikasiStok $notifikasi): RedirectResponse
     {
         $v = $request->validate([
             'nama_biji' => ['required', 'string', 'max:255', 'unique:stok_biji,nama_biji'],
@@ -78,12 +79,13 @@ class InventoryController extends Controller
             'laju_konsumsi_kg_per_jam' => ['required', 'numeric', 'min:0', 'max:1000'],
         ]);
 
-        StokBiji::create($v);
+        $bahan = StokBiji::create($v);
+        $notifikasi->periksaBahan($bahan);
 
         return back()->with('success', "Bahan {$v['nama_biji']} berhasil ditambahkan.");
     }
 
-    public function update(Request $request, StokBiji $inventory): RedirectResponse
+    public function update(Request $request, StokBiji $inventory, NotifikasiStok $notifikasi): RedirectResponse
     {
         $v = $request->validate([
             'kategori' => ['required', 'string', Rule::in(self::KATEGORI)],
@@ -96,6 +98,7 @@ class InventoryController extends Controller
         ]);
 
         $inventory->update($v);
+        $notifikasi->periksaBahan($inventory->refresh());
 
         return back()->with('success', "Stok {$inventory->nama_biji} diperbarui.");
     }
@@ -109,7 +112,7 @@ class InventoryController extends Controller
     }
 
     /** Reorder web (sinkron dengan POST /api/v1/inventory/reorder). */
-    public function reorder(Request $request, StokBiji $inventory, InventoryAgent $agent): RedirectResponse
+    public function reorder(Request $request, StokBiji $inventory, InventoryAgent $agent, NotifikasiStok $notifikasi): RedirectResponse
     {
         $v = $request->validate([
             'destination' => ['required', 'string', 'max:255'],
@@ -131,6 +134,8 @@ class InventoryController extends Controller
                 'waktu_dispatch' => now(),
             ]);
         });
+
+        $notifikasi->periksaBahan($inventory->refresh());
 
         return back()->with('success', "Pesanan ulang {$qty} {$inventory->satuan} {$inventory->nama_biji} ke {$v['destination']} terkirim.");
     }

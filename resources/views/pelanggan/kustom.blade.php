@@ -3,21 +3,10 @@
 @section('title', $produk->nama_produk . ' — Kustomisasi')
 
 @php
-    use App\Http\Controllers\CartController;
-    $UK = CartController::OPSI_UKURAN;
-    $SU = CartController::OPSI_SUSU;
-    $ES = CartController::OPSI_ES;
-    $MA = CartController::OPSI_MANIS;
-    $AD = CartController::OPSI_ADDON;
     $rp = fn ($n) => '+Rp ' . number_format($n, 0, ',', '.');
     // Mode ubah: prefill dari baris keranjang lama (old() tetap menang saat validasi gagal).
     $editOpsi = $editBaris['opsi'] ?? [];
     $modeUbah = ! empty($editKey) && ! empty($editBaris);
-    $defUkuran = old('ukuran', $editOpsi['ukuran'] ?? 'regular');
-    $defSusu = old('susu', $editOpsi['susu'] ?? 'fresh');
-    $defEs = old('es', $editOpsi['es'] ?? 'normal');
-    $defManis = old('manis', $editOpsi['manis'] ?? 'normal');
-    $defAddon = old('addon', $editOpsi['addon'] ?? []);
     $defCatatan = old('catatan', $editBaris['catatan'] ?? '');
     $defJumlah = old('jumlah', $editBaris['jumlah'] ?? 1);
 @endphp
@@ -130,115 +119,63 @@
                         </div>
                     @endif
 
-                    {{-- 1. Ukuran --}}
-                    <section class="cust-card p-4 sm:p-5">
-                        <div class="flex items-center justify-between gap-2">
-                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">1. Pilihan Ukuran</h2>
-                            <div class="flex gap-1.5"><span class="badge-must">WAJIB</span><span class="badge-pick">Pilih 1</span></div>
+                    {{-- Grup kustomisasi: dirender dari database, diatur admin per produk --}}
+                    @forelse ($grup as $urut => $g)
+                        @php
+                            $nilaiTerpilih = old('opsi.'.$g->kode, $editOpsi[$g->kode] ?? null);
+                            $pakaiGrid = $g->items->count() === 3
+                                && $g->items->every(fn ($item) => blank($item->deskripsi));
+                        @endphp
+                        <section class="cust-card p-4 sm:p-5">
+                            <div class="flex items-center justify-between gap-2">
+                                <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">{{ $urut + 1 }}. {{ $g->nama }}</h2>
+                                <div class="flex gap-1.5">
+                                    <span class="{{ $g->wajib ? 'badge-must' : 'badge-opt' }}">{{ $g->wajib ? 'WAJIB' : 'OPSIONAL' }}</span>
+                                    <span class="badge-pick">{{ $g->tipe === 'pilih_banyak' ? 'Bisa > 1' : 'Pilih 1' }}</span>
+                                </div>
+                            </div>
+                            <div class="mt-3 {{ $pakaiGrid ? 'grid grid-cols-3 gap-2' : 'space-y-2' }}">
+                                @foreach ($g->items as $item)
+                                    @php
+                                        $cek = $g->tipe === 'pilih_banyak'
+                                            ? in_array($item->kode, (array) $nilaiTerpilih, true)
+                                            : ($nilaiTerpilih === null ? $item->is_default : $nilaiTerpilih === $item->kode);
+                                    @endphp
+                                    <label class="opt {{ $pakaiGrid ? '!px-2 text-center' : '' }}">
+                                        <input type="{{ $g->tipe === 'pilih_banyak' ? 'checkbox' : 'radio' }}"
+                                               name="opsi[{{ $g->kode }}]{{ $g->tipe === 'pilih_banyak' ? '[]' : '' }}"
+                                               value="{{ $item->kode }}"
+                                               class="sr-only"
+                                               data-delta="{{ (float) $item->delta_harga }}"
+                                               data-tag="{{ strtoupper($item->kode) }}"
+                                               {{ $cek ? 'checked' : '' }}>
+                                        @if ($pakaiGrid)
+                                            <span class="block text-[13px] font-semibold text-[#F1DFD8]">{{ $item->label }}</span>
+                                        @else
+                                            <span class="flex items-center justify-between gap-3">
+                                                <span>
+                                                    <span class="block text-sm font-semibold text-[#F1DFD8]">{{ $item->label }}</span>
+                                                    @if ($item->deskripsi)
+                                                        <span class="mt-0.5 block text-xs text-[#B8A8A1]">{{ $item->deskripsi }}</span>
+                                                    @endif
+                                                </span>
+                                                <span class="text-[13px] font-semibold {{ (float) $item->delta_harga > 0 ? 'text-[#F1DFD8]' : 'text-[#B8A8A1]' }}">{{ $rp((float) $item->delta_harga) }}</span>
+                                            </span>
+                                        @endif
+                                    </label>
+                                @endforeach
+                            </div>
+                        </section>
+                    @empty
+                        <div class="cust-card p-4 text-[13px] text-[#B8A8A1]">
+                            Menu ini tidak memakai pilihan kustomisasi. Silakan atur jumlah lalu tambahkan ke keranjang.
                         </div>
-                        <div class="mt-3 space-y-2">
-                            <label class="opt">
-                                <input type="radio" name="ukuran" value="regular" class="sr-only" data-delta="0" data-tag="" {{ $defUkuran === 'regular' ? 'checked' : '' }}>
-                                <span class="flex items-center justify-between gap-3">
-                                    <span><span class="block text-sm font-semibold text-[#F1DFD8]">350 ml Regular</span>
-                                    <span class="mt-0.5 block text-xs text-[#B8A8A1]">Default</span></span>
-                                    <span class="text-[13px] font-semibold text-[#B8A8A1]">+Rp 0</span>
-                                </span>
-                            </label>
-                            <label class="opt">
-                                <input type="radio" name="ukuran" value="large" class="sr-only" data-delta="6000" data-tag="LARGE" {{ $defUkuran === 'large' ? 'checked' : '' }}>
-                                <span class="flex items-center justify-between gap-3">
-                                    <span class="block text-sm font-semibold text-[#F1DFD8]">500 ml Large</span>
-                                    <span class="text-[13px] font-semibold text-[#F1DFD8]">{{ $rp(6000) }}</span>
-                                </span>
-                            </label>
-                        </div>
-                    </section>
-
-                    {{-- 2. Susu --}}
-                    <section class="cust-card p-4 sm:p-5">
-                        <div class="flex items-center justify-between gap-2">
-                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">2. Pilihan Susu</h2>
-                            <div class="flex gap-1.5"><span class="badge-must">WAJIB</span><span class="badge-pick">Pilih 1</span></div>
-                        </div>
-                        <div class="mt-3 space-y-2">
-                            @php
-                                $susuDesc = ['fresh' => 'Standar Barista House Blend', 'oat' => 'Plant-based • Creamy', 'almond' => 'Plant-based • Nutty & Light', 'skim' => 'Low Fat Dairy'];
-                                $susuTag = ['fresh' => '', 'oat' => 'OAT', 'almond' => 'ALMOND', 'skim' => ''];
-                            @endphp
-                            @foreach ($SU as $val => $o)
-                                <label class="opt">
-                                    <input type="radio" name="susu" value="{{ $val }}" class="sr-only" data-delta="{{ $o['delta'] }}" data-tag="{{ $susuTag[$val] }}" {{ $defSusu === $val ? 'checked' : '' }}>
-                                    <span class="flex items-center justify-between gap-3">
-                                        <span><span class="block text-sm font-semibold text-[#F1DFD8]">{{ $o['label'] }}</span>
-                                        <span class="mt-0.5 block text-xs text-[#B8A8A1]">{{ $susuDesc[$val] }}</span></span>
-                                        <span class="text-[13px] font-semibold {{ $o['delta'] ? 'text-[#F1DFD8]' : 'text-[#B8A8A1]' }}">{{ $rp($o['delta']) }}</span>
-                                    </span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </section>
-
-                    {{-- 3. Es --}}
-                    <section class="cust-card p-4 sm:p-5">
-                        <div class="flex items-center justify-between gap-2">
-                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">3. Level Es</h2>
-                            <div class="flex gap-1.5"><span class="badge-must">WAJIB</span><span class="badge-pick">Pilih 1</span></div>
-                        </div>
-                        <div class="mt-3 grid grid-cols-3 gap-2">
-                            @foreach ($ES as $val => $o)
-                                <label class="opt !px-2 text-center">
-                                    <input type="radio" name="es" value="{{ $val }}" class="sr-only" {{ $defEs === $val ? 'checked' : '' }}>
-                                    <span class="block text-[13px] font-semibold text-[#F1DFD8]">{{ $o['label'] }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </section>
-
-                    {{-- 4. Manis --}}
-                    <section class="cust-card p-4 sm:p-5">
-                        <div class="flex items-center justify-between gap-2">
-                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">4. Level Manis</h2>
-                            <div class="flex gap-1.5"><span class="badge-must">WAJIB</span><span class="badge-pick">Pilih 1</span></div>
-                        </div>
-                        <div class="mt-3 grid grid-cols-3 gap-2">
-                            @foreach ($MA as $val => $o)
-                                <label class="opt !px-2 text-center">
-                                    <input type="radio" name="manis" value="{{ $val }}" class="sr-only" {{ $defManis === $val ? 'checked' : '' }}>
-                                    <span class="block text-[13px] font-semibold text-[#F1DFD8]">{{ $o['label'] }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </section>
-
-                    {{-- 5. Add-on --}}
-                    <section class="cust-card p-4 sm:p-5">
-                        <div class="flex items-center justify-between gap-2">
-                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">5. Tambahan / Add-ons</h2>
-                            <div class="flex gap-1.5"><span class="badge-opt">OPSIONAL</span><span class="badge-pick">Bisa &gt; 1</span></div>
-                        </div>
-                        <div class="mt-3 space-y-2">
-                            @php
-                                $adDesc = ['shot' => '+1 Single origin ristretto', 'foam' => 'Cold foam topping velvet texture'];
-                                $adTag = ['shot' => 'SHOT', 'foam' => 'FOAM'];
-                            @endphp
-                            @foreach ($AD as $val => $o)
-                                <label class="opt">
-                                    <input type="checkbox" name="addon[]" value="{{ $val }}" class="sr-only" data-delta="{{ $o['delta'] }}" data-tag="{{ $adTag[$val] }}" {{ in_array($val, $defAddon) ? 'checked' : '' }}>
-                                    <span class="flex items-center justify-between gap-3">
-                                        <span><span class="block text-sm font-semibold text-[#F1DFD8]">{{ $o['label'] }}</span>
-                                        <span class="mt-0.5 block text-xs text-[#B8A8A1]">{{ $adDesc[$val] }}</span></span>
-                                        <span class="text-[13px] font-semibold text-[#F1DFD8]">{{ $rp($o['delta']) }}</span>
-                                    </span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </section>
+                    @endforelse
 
                     {{-- 6. Catatan --}}
                     <section class="cust-card p-4 sm:p-5">
                         <div class="flex items-center justify-between gap-2">
-                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">6. Catatan Khusus Barista</h2>
+                            <h2 class="grotesk text-[15px] font-bold text-[#F1DFD8]">{{ $grup->count() + 1 }}. Catatan Khusus Barista</h2>
                             <div class="flex gap-1.5"><span class="badge-opt">OPSIONAL</span><span class="badge-pick">Maks. 100 Karakter</span></div>
                         </div>
                         <textarea name="catatan" id="cust-note" rows="2" maxlength="100" placeholder="Contoh: Pisahkan es batu, sedotan ramah lingkungan..."

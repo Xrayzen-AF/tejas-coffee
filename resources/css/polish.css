@@ -1,0 +1,147 @@
+/* ==========================================================================
+   Tejas Coffee — Lapisan perapian visual (polish layer)
+   --------------------------------------------------------------------------
+   ATURAN: berkas ini hanya mengatur tata letak, jarak, radius, bayangan,
+   transisi, dan animasi. TIDAK ada perubahan jenis font, warna teks, warna
+   latar, atau warna tombol — semuanya memakai token yang sudah ada.
+   ========================================================================== */
+
+:root {
+    --polish-ease: cubic-bezier(.22, .61, .36, 1);
+    --polish-dur: .3s;
+    --polish-lift: -3px;
+    --polish-shadow-rest: 0 1px 2px rgba(0, 0, 0, .35);
+    --polish-shadow-hover: 0 14px 28px -18px rgba(0, 0, 0, .75), 0 4px 10px -6px rgba(0, 0, 0, .55);
+}
+
+/* ------------------------------------------------------------ dasar halus --- */
+html {
+    scroll-behavior: smooth;
+    /* Judul yang dituju anchor tidak tertutup topbar lengket. */
+    scroll-padding-top: 84px;
+}
+
+body {
+    text-rendering: optimizeLegibility;
+}
+
+:is(a, button, [role="button"], summary, input, select, textarea):focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+/* Tombol & tautan: umpan balik tekan yang halus (tanpa mengubah warna). */
+@media (hover: hover) and (pointer: fine) {
+    :is(button, [role="button"], .btn-primary, .btn-secondary, .btn-sm, .btn-new-ticket) {
+        transition: transform .18s var(--polish-ease), box-shadow .18s var(--polish-ease),
+            background-color .18s var(--polish-ease), border-color .18s var(--polish-ease),
+            color .18s var(--polish-ease);
+    }
+
+    :is(button, [role="button"], .btn-primary, .btn-secondary, .btn-sm, .btn-new-ticket):active {
+        transform: translateY(1px) scale(.995);
+    }
+}
+
+/* -------------------------------------------------------------- kartu ------- */
+/* .tejas-card dipasang otomatis oleh resources/js/ui-polish.js pada elemen
+   ber-class *card / *panel / *tile agar semua halaman ikut tanpa mengubah
+   markup Blade dan tanpa menyentuh skema warna. */
+.tejas-card {
+    transition: transform var(--polish-dur) var(--polish-ease),
+        box-shadow var(--polish-dur) var(--polish-ease),
+        border-color var(--polish-dur) var(--polish-ease);
+    will-change: transform;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .tejas-card.tejas-card:hover {
+        transform: translateY(var(--polish-lift));
+        box-shadow: var(--polish-shadow-hover);
+    }
+}
+
+/* -------------------------------------------------------------- animasi ----- */
+/* Kelas reveal hanya ditambahkan lewat JS. Tanpa JS/reduced-motion konten
+   tetap terlihat normal (tidak pernah disembunyikan lewat CSS saja). */
+.tejas-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity .55s var(--polish-ease), transform .55s var(--polish-ease);
+    transition-delay: var(--tejas-delay, 0ms);
+}
+
+.tejas-reveal.is-visible {
+    opacity: 1;
+    transform: none;
+}
+
+/* Catatan: animasi pada seluruh wadah konten sengaja TIDAK dipakai.
+   Menganimasikan opacity/transform satu wadah besar membuat seluruh halaman
+   bisa tertinggal transparan saat frame browser ditunda, dan transform pada
+   induk mengubah acuan elemen position:fixed. Animasi masuk cukup per kartu. */
+
+/* --------------------------------------------------- perapian panel admin --- */
+.admin-content {
+    padding-bottom: clamp(48px, 6vw, 80px);
+}
+
+.admin-body .card {
+    padding: clamp(18px, 1.5vw, 22px);
+}
+
+.admin-body .card-title-row {
+    margin-bottom: 18px;
+}
+
+.admin-body .ops-table tbody td {
+    padding: 13px 14px;
+}
+
+.admin-body .ops-table thead th {
+    padding: 10px 14px;
+}
+
+.admin-body .item-row,
+.admin-body .roster-item {
+    padding: 12px 0;
+}
+
+.admin-body .form-grid {
+    row-gap: 8px;
+}
+
+.admin-body .bean-box {
+    padding: 14px 16px;
+}
+
+/* Jarak antarseksi yang konsisten di halaman panjang. */
+.admin-content > section + section {
+    margin-top: 20px;
+}
+
+/* ---------------------------------------------------------------- responsif - */
+@media (max-width: 620px) {
+    .admin-body .card {
+        padding: 16px;
+    }
+
+    .admin-body .ops-table tbody td {
+        padding: 11px 12px;
+    }
+}
+
+/* ------------------------------------------------------- hormati reduce motion */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    .tejas-card,
+    .tejas-reveal {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+    }
+}

@@ -165,16 +165,18 @@
                 <div class="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2.5">
                     @foreach ($rekomendasi as $r)
                         <div class="cart-card flex flex-col overflow-hidden">
-                            <div class="relative w-full items-center justify-center bg-[#241B17] overflow-hidden p-2">
+                            <div class="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[#14100d] p-2">
                                 @if ($r->url_gambar)
                                     <img src="{{ $r->url_gambar }}" alt="{{ $r->nama_produk }}" class="h-full w-full object-contain transition-transform duration-200 hover:scale-105">
                                 @else
                                     <i data-lucide="coffee" class="h-6 w-6 text-[#9D8E87]"></i>
                                 @endif
                             </div>
-                            <div class="p-2.5">
+                            <div class="flex flex-1 flex-col justify-between p-2.5">
+                                <div>
                                 <h3 class="line-clamp-1 text-xs font-semibold text-[#F1DFD8]">{{ $r->nama_produk }}</h3>
                                 <p class="mt-0.5 line-clamp-1 text-[11px] text-[#B8A8A1]">{{ $r->deskripsi ?? $r->kategori->nama_kategori ?? '' }}</p>
+                                </div>
                                 <form method="POST" action="{{ route('pelanggan.keranjang.tambah', $r->id_produk) }}" class="mt-1.5">
                                     @csrf
                                     <input type="hidden" name="jumlah" value="1">

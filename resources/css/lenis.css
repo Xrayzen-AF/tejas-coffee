@@ -1,0 +1,30 @@
+/* ==========================================================================
+   Lenis — smooth momentum scroll
+   --------------------------------------------------------------------------
+   Aturan dasar dari dokumentasi Lenis, disesuaikan dengan aplikasi ini.
+   Tidak ada perubahan warna, font, atau ukuran: hanya perilaku scroll.
+   ========================================================================== */
+
+/* Tinggi paksa 100% pada html/body dapat memotong perhitungan scroll Lenis. */
+html.lenis,
+html.lenis body {
+    height: auto;
+}
+
+/* Saat Lenis aktif, animasinya yang mengatur; matikan smooth bawaan CSS
+   (sebelumnya diatur di polish.css) agar tidak saling menimpa.
+   Kelas `lenis` selalu ada selama Lenis hidup, `lenis-smooth` baru muncul
+   setelah scroll pertama — jadi patokannya kelas `lenis`. */
+html.lenis {
+    scroll-behavior: auto !important;
+}
+
+/* Elemen ber-scroll sendiri (modal, daftar notifikasi) tetap native. */
+.lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+}
+
+/* Halaman dikunci selama modal terbuka (dipicu smooth-scroll.js). */
+.lenis.lenis-stopped {
+    overflow: hidden;
+}

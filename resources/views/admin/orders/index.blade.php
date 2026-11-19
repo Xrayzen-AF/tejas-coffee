@@ -112,6 +112,7 @@
             </td>
             <td>
               <div class="row-actions">
+                <button type="button" class="btn-sm" data-modal-open="detail-pesanan-{{ $p->id_pesanan }}"><i data-lucide="receipt" size="13"></i> Detail</button>
                 @foreach ($transisi[$p->status_pesanan] as $tujuan)
                   @if ($tujuan !== 'dibatalkan')
                     <form method="POST" action="{{ route('admin.orders.status', $p) }}" style="display:inline;">@csrf
@@ -218,4 +219,70 @@
       <span>Pesanan adalah <strong>tabel transaksi</strong> — isinya dibuat oleh kasir/pelanggan, admin hanya menggerakkan status & pembatalan.</span>
     </div>
   </section>
+
+  {{-- Detail per pesanan: rincian item, total, dan pembayaran tanpa memenuhi baris tabel. --}}
+  @foreach ($pesanan as $p)
+    <x-app-modal id="detail-pesanan-{{ $p->id_pesanan }}" title="Detail Pesanan" :subtitle="$p->nomor_pesanan . ' · ' . $p->waktu_pesan->translatedFormat('d M Y H:i')" width="720px">
+      <div class="table-wrap" style="margin-bottom:14px;">
+        <table class="ops-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th style="text-align:right;">Harga</th>
+              <th style="text-align:right;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach ($p->detailPesanan as $d)
+              <tr>
+                <td>
+                  <div class="emp-name">{{ $d->produk?->nama_produk ?? 'Produk #' . $d->id_produk }}</div>
+                  @if ($d->catatan_item)
+                    <div class="emp-email">{{ $d->catatan_item }}</div>
+                  @endif
+                </td>
+                <td>{{ $d->jumlah }}</td>
+                <td style="text-align:right;white-space:nowrap;">Rp {{ number_format($d->harga_satuan, 0, ',', '.') }}</td>
+                <td style="text-align:right;white-space:nowrap;">Rp {{ number_format($d->subtotal, 0, ',', '.') }}</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:grid;gap:7px;font-size:12px;">
+        <div style="display:flex;justify-content:space-between;gap:10px;">
+          <span style="color:var(--text-muted);">Tipe</span>
+          <span>{{ ucfirst($p->tipe_pesanan) }}@if ($p->meja) · Meja {{ $p->meja->nomor_meja }}@endif</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:10px;">
+          <span style="color:var(--text-muted);">Pelanggan</span>
+          <span>{{ $p->pengguna?->nama_lengkap ?? $p->pelanggan?->nama_pelanggan ?? $p->nama_pemesan ?? '—' }}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:10px;">
+          <span style="color:var(--text-muted);">Pembayaran</span>
+          <span>
+            {{ $p->transaksi?->status_pembayaran ? ucfirst($p->transaksi->status_pembayaran) : 'Belum dibayar' }}@if ($p->transaksi?->metodePembayaran) · {{ $p->transaksi->metodePembayaran->nama_metode }}@endif
+          </span>
+        </div>
+        @if ((float) ($p->diskon ?? 0) > 0)
+          <div style="display:flex;justify-content:space-between;gap:10px;">
+            <span style="color:var(--text-muted);">Diskon</span>
+            <span>-Rp {{ number_format($p->diskon, 0, ',', '.') }}</span>
+          </div>
+        @endif
+        @if ((float) ($p->biaya_layanan ?? 0) > 0)
+          <div style="display:flex;justify-content:space-between;gap:10px;">
+            <span style="color:var(--text-muted);">Biaya layanan</span>
+            <span>Rp {{ number_format($p->biaya_layanan, 0, ',', '.') }}</span>
+          </div>
+        @endif
+        <div style="display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--border-color);padding-top:8px;font-weight:700;">
+          <span>Total</span>
+          <span>Rp {{ number_format($p->total_harga, 0, ',', '.') }}</span>
+        </div>
+      </div>
+    </x-app-modal>
+  @endforeach
 @endsection

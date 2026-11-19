@@ -4,6 +4,12 @@
 @section('header-title', 'Master Kategori')
 @section('header-subtitle', 'Data dasar jenis menu — induk dari tabel produk')
 
+@section('header-action')
+  <button type="button" class="btn-new-ticket" data-modal-open="tambah-kategori">
+    <i data-lucide="plus" size="14"></i> Tambah Kategori
+  </button>
+@endsection
+
 @section('content')
   @if (session('error'))
     <div class="alert-error">{{ session('error') }}</div>
@@ -27,7 +33,7 @@
     </div>
   </section>
 
-  <section class="bottom-grid">
+  <section>
     <div class="card">
       <div class="card-title-row"><div><h3>Daftar Kategori</h3><p>Klik Update untuk ubah data</p></div></div>
       <div class="table-wrap">
@@ -45,16 +51,17 @@
                     <button class="btn-sm danger"><i data-lucide="trash-2" size="13"></i></button>
                   </form>
                 </div>
-                <details style="margin-top:8px;">
-                  <summary style="font-size:12px;font-weight:600;cursor:pointer;color:var(--accent-caramel);">Update</summary>
-                  <form method="POST" action="{{ route('admin.master.kategori.update', $k) }}" style="display:grid;gap:8px;margin-top:8px;">
+                <button type="button" class="btn-sm" data-modal-open="edit-kategori-{{ $k->id_kategori }}" style="margin-top:8px;width:100%;">Update</button>
+
+                <x-app-modal id="edit-kategori-{{ $k->id_kategori }}" title="Update Kategori" :subtitle="$k->nama_kategori" width="460px">
+                  <form method="POST" action="{{ route('admin.master.kategori.update', $k) }}" class="app-modal-form">
                     @csrf @method('PUT')
                     <input name="nama_kategori" value="{{ old('nama_kategori', $k->nama_kategori) }}" class="form-input" required>
                     <input name="deskripsi" value="{{ old('deskripsi', $k->deskripsi) }}" class="form-input" placeholder="Deskripsi">
                     <label class="form-hint" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="status_aktif" value="1" @checked($k->status_aktif)> Status aktif</label>
-                    <button class="btn-sm primary">Simpan</button>
+                    <button type="submit" class="btn-primary full" style="padding:10px;">Simpan</button>
                   </form>
-                </details>
+                </x-app-modal>
               </td>
             </tr>
           @empty
@@ -68,9 +75,8 @@
       @endif
     </div>
 
-    <div class="card">
-      <div class="card-title-row"><div><h3>Tambah Kategori Baru</h3><p>Data master — dibaca produk & menu</p></div></div>
-      <form method="POST" action="{{ route('admin.master.kategori.store') }}">
+    <x-app-modal id="tambah-kategori" title="Tambah Kategori" subtitle="Data master — dibaca produk & menu" width="460px">
+      <form method="POST" action="{{ route('admin.master.kategori.store') }}" class="app-modal-form">
         @csrf
         <div class="form-group"><label class="form-label">Nama kategori</label><input name="nama_kategori" class="form-input" placeholder="Kopi Non-Espresso" required></div>
         <div class="form-group"><label class="form-label">Deskripsi</label><input name="deskripsi" class="form-input" placeholder="Bukan espresso"></div>
@@ -79,8 +85,8 @@
             <input type="checkbox" name="status_aktif" value="1" checked> Status aktif (tampak di menu pelanggan)
           </label>
         </div>
-        <button class="btn-primary" style="width:100%;padding:10px;">Simpan Kategori</button>
+        <button type="submit" class="btn-primary full" style="padding:10px;">Simpan Kategori</button>
       </form>
-    </div>
+    </x-app-modal>
   </section>
 @endsection

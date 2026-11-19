@@ -36,6 +36,8 @@ class MejaQrService
 
     public const KODE_TERISI = 'terisi';
 
+    public function __construct(private readonly MejaKodeService $kode) {}
+
     /** Pelanggan (member) milik akun login, tanpa membuat baris baru. */
     public function pelangganAkun(?Pengguna $pengguna): ?Pelanggan
     {
@@ -270,6 +272,11 @@ class MejaQrService
             $reservasi->update(['status' => 'selesai']);
             Pesanan::sinkronMeja($meja->id_meja);
         });
+
+        // PIN/permintaan PIN meja ini tidak berlaku lagi setelah dilepas,
+        // lalu beri tahu layar kasir meja mana yang baru saja dilepas.
+        $this->kode->batalkan($meja);
+        $this->kode->catatLepas($meja);
     }
 
     /**

@@ -8,6 +8,18 @@
 {{-- ═══ BOTTOM NAV PELANGGAN — dipakai identik di semua halaman ═══ --}}
 <nav class="bnav" aria-label="Navigasi pelanggan">
     <div class="mx-auto flex w-full max-w-md items-end px-6 sm:max-w-xl md:max-w-2xl">
+        @guest
+            {{-- Tamu tanpa akun hanya bisa melihat menu; item lain mengarah ke login. --}}
+            <a href="{{ route('pelanggan.menu') }}" class="active">
+                <i data-lucide="book-open" class="h-5 w-5"></i>Menu
+            </a>
+            <a href="{{ route('register') }}">
+                <i data-lucide="user-plus" class="h-5 w-5"></i>Daftar
+            </a>
+            <a href="{{ route('login') }}" class="bnav-cart" title="Masuk" aria-label="Masuk">
+                <i data-lucide="log-in" class="h-6 w-6"></i>
+            </a>
+        @else
         <a href="{{ route('pelanggan.dashboard') }}" class="{{ $aktif === 'beranda' ? 'active' : '' }}">
             <i data-lucide="home" class="h-5 w-5"></i>Beranda
         </a>
@@ -27,6 +39,7 @@
         <a href="{{ route('pelanggan.profil') }}" class="{{ $aktif === 'profil' ? 'active' : '' }}">
             <i data-lucide="user" class="h-5 w-5"></i>Profil
         </a>
+        @endguest
     </div>
 </nav>
 

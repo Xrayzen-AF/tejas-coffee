@@ -8,6 +8,7 @@ use App\Models\Pengguna;
 use App\Models\Pesanan;
 use App\Models\StokBiji;
 use App\Models\Transaksi;
+use App\Services\NotifikasiStok;
 use Illuminate\View\View;
 
 /**
@@ -15,8 +16,11 @@ use Illuminate\View\View;
  */
 class OverviewController extends Controller
 {
-    public function index(): View
+    public function index(NotifikasiStok $notifikasi): View
     {
+        // Pastikan lonceng sudah berisi notifikasi saat dashboard pertama dibuka.
+        $notifikasi->periksaSemua();
+
         $omzetHariIni = (float) Transaksi::query()
             ->where('status_pembayaran', 'lunas')
             ->whereDate('waktu_pembayaran', today())

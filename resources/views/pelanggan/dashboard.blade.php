@@ -74,8 +74,8 @@
 
   /* ——— Grid produk ——— */
   .home-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .home-thumb { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; background: #241B17; padding: 10px; overflow: hidden; }
-  .home-thumb img { width: 100%; height: 100%; object-fit: contain; transition: transform .25s ease; }
+  .home-thumb { position: relative; display: block; width: 100%; }
+  .home-thumb img { transition: transform .25s ease; }
   .home-thumb:hover img { transform: scale(1.05); }
   @media (max-width: 519.98px) { .home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (min-width: 1024px) { .home-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
@@ -197,13 +197,10 @@
                 </ol>
 
                 <div class="mt-3 grid grid-cols-2 gap-2">
-                    <details class="rounded-md bg-[#2F231D] text-center">
-                        <summary class="flex cursor-pointer list-none items-center justify-center gap-1.5 px-3 py-2.5 text-[13px] font-semibold text-[#F1DFD8]">
-                            <i data-lucide="qr-code" class="h-4 w-4"></i> QR Ambil
-                        </summary>
-                        <p class="px-3 pb-3 text-[11px] text-[#B8A8A1]">Tunjukkan kode ini di bar:</p>
-                        <p class="grotesk mx-3 mb-3 rounded-lg bg-[#271D19] px-2 py-2 text-sm font-bold tracking-wide text-[#F1DFD8]">{{ $pesananAktif->nomor_pesanan }}</p>
-                    </details>
+                    <button type="button" data-modal-open="qr-ambil-{{ $pesananAktif->id_pesanan }}"
+                            class="flex items-center justify-center gap-1.5 rounded-md bg-[#2F231D] px-3 py-2.5 text-[13px] font-semibold text-[#F1DFD8] transition hover:bg-[#352A22]">
+                        <i data-lucide="qr-code" class="h-4 w-4"></i> QR Ambil
+                    </button>
                     <a href="{{ route('pelanggan.status', $pesananAktif->nomor_pesanan) }}"
                        class="flex items-center justify-center gap-1.5 rounded-md bg-[#D97706] px-3 py-2.5 text-[13px] font-semibold text-[#241708] transition hover:bg-[#B56100]">
                         <i data-lucide="receipt-text" class="h-4 w-4"></i> Detail Tiket
@@ -290,11 +287,13 @@
                 @php $habis = ! $p->status_tersedia || $p->stok <= 0; @endphp
                 <div class="home-card flex flex-col overflow-hidden">
                     <div class="home-thumb">
-                        @if ($p->url_gambar)
-                            <img src="{{ $p->url_gambar }}" alt="{{ $p->nama_produk }}" class="h-full w-full object-contain transition-transform duration-300 hover:scale-105">
-                        @else
-                            <i data-lucide="coffee" class="h-10 w-10 text-[#9D8E87]"></i>
-                        @endif
+                        <div class="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg bg-[#14100d] p-3">
+                            @if ($p->url_gambar)
+                                <img src="{{ $p->url_gambar }}" alt="{{ $p->nama_produk }}" class="h-full w-full object-contain transition-transform duration-300 hover:scale-105" loading="lazy">
+                            @else
+                                <i data-lucide="coffee" class="h-10 w-10 text-[#9D8E87]"></i>
+                            @endif
+                        </div>
                         <span class="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-[#271D19]/90 text-[#F87171] shadow" title="Favorit pelanggan">
                             <i data-lucide="heart" class="h-4 w-4 fill-current"></i>
                         </span>
@@ -330,7 +329,7 @@
 
     {{-- ═══ PANEL STATUS MEJA (real-time) ═══ --}}
     <div id="meja-sheet" class="meja-backdrop" aria-hidden="true">
-        <div class="meja-sheet" role="dialog" aria-modal="true" aria-labelledby="meja-title">
+        <div class="meja-sheet" role="dialog" aria-modal="true" aria-labelledby="meja-title" data-lenis-prevent>
             <div class="meja-handle" aria-hidden="true"></div>
             <div class="flex items-start justify-between gap-3 px-5 pt-1">
                 <div>
@@ -505,4 +504,10 @@
 </script>
 <script>if (window.lucide) lucide.createIcons();</script>
 @endpush
+    @if ($pesananAktif)
+        <x-app-modal id="qr-ambil-{{ $pesananAktif->id_pesanan }}" title="Kode Ambil Pesanan" subtitle="Tunjukkan kode ini di bar atau kasir" width="420px">
+            <p class="grotesk" style="border-radius:10px;background:#271D19;padding:16px;text-align:center;font-size:22px;font-weight:700;letter-spacing:.06em;color:#F1DFD8;">{{ $pesananAktif->nomor_pesanan }}</p>
+            <p style="margin-top:10px;font-size:11.5px;line-height:1.65;color:#9D8E87;">Tunjukkan kode ini di bar / kasir saat mengambil pesanan.</p>
+        </x-app-modal>
+    @endif
 @endsection

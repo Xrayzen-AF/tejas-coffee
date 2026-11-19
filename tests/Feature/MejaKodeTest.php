@@ -128,6 +128,19 @@ class MejaKodeTest extends TestCase
             ->assertSee('Kode Sekali Pakai per Meja');
     }
 
+    public function test_kasir_melihat_penanda_meja_yang_baru_dilepas(): void
+    {
+        $meja = $this->meja('M07');
+
+        app(MejaKodeService::class)->catatLepas($meja);
+
+        $this->actingAs($this->staf())
+            ->getJson(route('meja-kode.status'))
+            ->assertOk()
+            ->assertJsonPath('tables.0.lepas_id', fn ($id) => is_string($id) && $id !== '')
+            ->assertJsonPath('tables.0.lepas_detik', fn ($detik) => is_int($detik) && $detik >= 0);
+    }
+
     public function test_halaman_kasir_menampilkan_status_meja_dan_pin_aktif(): void
     {
         $meja = $this->meja('M01');

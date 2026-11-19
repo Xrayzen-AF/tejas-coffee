@@ -42,6 +42,12 @@
         @yield('content')
     </div>
 
+    {{-- Struk pembayaran dalam modal (tanpa tab baru). --}}
+    @include('struk._modal')
+
+    {{-- Kontrol modal bersama (data-modal-open / data-tutup-modal). --}}
+    @include('partials.modal-dialog')
+
     {{-- Konfirmasi kustom (ganti alert/confirm bawaan browser) --}}
     <div id="tejas-confirm" class="tejas-modal-backdrop" aria-hidden="true">
         <div class="tejas-modal" role="dialog" aria-modal="true" aria-labelledby="tejas-confirm-title">

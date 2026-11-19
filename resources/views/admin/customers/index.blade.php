@@ -5,7 +5,7 @@
 @section('header-subtitle', $total . ' member terdaftar • ' . $baruHariIni . ' baru hari ini')
 
 @section('header-action')
-  <button class="btn-new-ticket" onclick="document.getElementById('form-member').scrollIntoView({behavior:'smooth'})"><i data-lucide="plus" size="16"></i> Tambah Member</button>
+  <button type="button" class="btn-new-ticket" data-modal-open="tambah-member"><i data-lucide="plus" size="16"></i> Tambah Member</button>
 @endsection
 
 @section('content')
@@ -74,16 +74,15 @@
     @if ($members->hasPages())<div class="pagination-wrap">{{ $members->links() }}</div>@endif
   </section>
 
-  <section class="card" id="form-member" style="max-width:640px;">
-    <div class="card-title-row"><div><h3>Tambah Member Manual</h3><p>Untuk pelanggan yang daftar via kasir</p></div></div>
-    <form method="POST" action="{{ route('admin.customers.store') }}">
+  <x-app-modal id="tambah-member" title="Tambah Member Manual" subtitle="Untuk pelanggan yang daftar via kasir" width="520px">
+    <form method="POST" action="{{ route('admin.customers.store') }}" class="app-modal-form">
       @csrf
       <div class="form-grid">
         <div class="form-group"><label class="form-label">Nama pelanggan</label><input name="nama_pelanggan" class="form-input" required placeholder="Nama lengkap"></div>
         <div class="form-group"><label class="form-label">Nomor telepon</label><input name="nomor_telepon" class="form-input" placeholder="08xx..."></div>
       </div>
       <div class="form-group" style="max-width:200px;"><label class="form-label">Poin awal</label><input name="poin_loyalitas" type="number" min="0" value="0" class="form-input"></div>
-      <button class="btn-primary" style="padding:10px 22px;">Simpan Member</button>
+      <button type="submit" class="btn-primary full" style="padding:10px 22px;">Simpan Member</button>
     </form>
-  </section>
+  </x-app-modal>
 @endsection

@@ -45,6 +45,9 @@ class MejaKodeService
     /** Jeda minimal antar-permintaan agar kasir tidak dibanjiri. */
     public const JEDA_MINTA_DETIK = 15;
 
+    /** Penanda "meja dilepas" ditampilkan ke layar kasir selama 2 menit. */
+    public const LEPAS_TTL_DETIK = 120;
+
     public const SESSION_PERMINTAAN = 'meja_pin_permintaan';
 
     /**
@@ -144,6 +147,37 @@ class MejaKodeService
         return [
             'id' => (string) ($data['id'] ?? ''),
             'umur_detik' => max(0, now()->timestamp - (int) ($data['diminta_pada'] ?? now()->timestamp)),
+        ];
+    }
+
+    /**
+     * Catat bahwa tamu melepas mejanya, agar layar kasir bisa memberi tahu
+     * meja mana yang baru saja kembali kosong.
+     */
+    public function catatLepas(Meja $meja): void
+    {
+        Cache::put($this->kunciLepas($meja), [
+            'id' => (string) Str::uuid(),
+            'pada' => now()->timestamp,
+        ], self::LEPAS_TTL_DETIK);
+    }
+
+    /**
+     * Kejadian pelepasan meja yang masih segar (untuk layar kasir).
+     *
+     * @return array{id: string, lepas_detik: int}|null
+     */
+    public function lepasTerakhir(Meja $meja): ?array
+    {
+        $data = Cache::get($this->kunciLepas($meja));
+
+        if (! is_array($data) || (int) ($data['pada'] ?? 0) + self::LEPAS_TTL_DETIK <= now()->timestamp) {
+            return null;
+        }
+
+        return [
+            'id' => (string) ($data['id'] ?? ''),
+            'lepas_detik' => max(0, now()->timestamp - (int) ($data['pada'] ?? now()->timestamp)),
         ];
     }
 
@@ -365,5 +399,10 @@ class MejaKodeService
     private function kunciKirim(Meja $meja): string
     {
         return 'meja-pin-kirim:'.$meja->id_meja;
+    }
+
+    private function kunciLepas(Meja $meja): string
+    {
+        return 'meja-lepas:'.$meja->id_meja;
     }
 }

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Kategori;
+use App\Models\OpsiGrup;
 use App\Models\Produk;
+use App\Services\NotifikasiStok;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -19,13 +21,14 @@ class MasterProdukController extends Controller
     public function index(): View
     {
         return view('admin.master.produk', [
-            'produk' => Produk::with('kategori')->orderBy('nama_produk')->paginate(15),
+            'produk' => Produk::with('kategori', 'opsiGrup:id_opsi_grup')->orderBy('nama_produk')->paginate(15),
             'kategori' => Kategori::orderBy('nama_kategori')->get(),
+            'semuaGrup' => OpsiGrup::orderBy('urutan')->orderBy('id_opsi_grup')->get(),
             'activeMenu' => 'produk',
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, NotifikasiStok $notifikasi): RedirectResponse
     {
         $v = $this->validated($request);
 
@@ -40,12 +43,17 @@ class MasterProdukController extends Controller
             $v['url_gambar'] = '/images/products/'.$filename;
         }
 
-        Produk::create($v);
+        $grupIds = $v['grup_ids'] ?? [];
+        unset($v['grup_ids']);
+
+        $produk = Produk::create($v);
+        $produk->opsiGrup()->sync($grupIds);
+        $notifikasi->periksaProduk($produk);
 
         return back()->with('success', "Produk {$v['nama_produk']} ditambahkan.");
     }
 
-    public function update(Request $request, Produk $produk): RedirectResponse
+    public function update(Request $request, Produk $produk, NotifikasiStok $notifikasi): RedirectResponse
     {
         $v = $this->validated($request, $produk);
 
@@ -72,7 +80,12 @@ class MasterProdukController extends Controller
             $v['url_gambar'] = $produk->url_gambar;
         }
 
+        $grupIds = $v['grup_ids'] ?? [];
+        unset($v['grup_ids']);
+
         $produk->update($v);
+        $produk->opsiGrup()->sync($grupIds);
+        $notifikasi->periksaProduk($produk->refresh());
 
         return back()->with('success', "Produk {$produk->nama_produk} diperbarui.");
     }
@@ -110,6 +123,8 @@ class MasterProdukController extends Controller
             'stok' => ['required', 'integer', 'min:0', 'max:4294967295'],
             'gambar' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif,avif', 'max:5120'],
             'status_tersedia' => ['nullable', 'boolean'],
+            'grup_ids' => ['nullable', 'array'],
+            'grup_ids.*' => ['integer', 'exists:opsi_grup,id_opsi_grup'],
         ], [
             'id_kategori.required' => 'Kategori wajib dipilih.',
             'id_kategori.exists' => 'Kategori tidak ditemukan.',

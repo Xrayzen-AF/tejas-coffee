@@ -9,6 +9,7 @@ use App\Models\Pesanan;
 use App\Models\Produk;
 use App\Models\Promo;
 use App\Models\Transaksi;
+use App\Services\NotifikasiStok;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -258,6 +259,12 @@ class OrderController extends Controller
             return $pesanan->fresh('detailPesanan');
         });
 
+        // Beri tahu admin bila ada menu yang stoknya baru saja habis.
+        $notifikasi = app(NotifikasiStok::class);
+        foreach (Produk::whereIn('id_produk', $pesanan->detailPesanan->pluck('id_produk'))->get() as $produkTerdampak) {
+            $notifikasi->periksaProduk($produkTerdampak);
+        }
+
         return response()->json([
             'message' => 'Pesanan berhasil dibuat.',
             'data' => $pesanan->load('detailPesanan', 'transaksi'),
@@ -357,6 +364,12 @@ class OrderController extends Controller
 
         try {
             $pesanan->batalkan();
+
+            // Stok dikembalikan: tutup notifikasi "habis" yang sudah tidak berlaku.
+            $notifikasi = app(NotifikasiStok::class);
+            foreach (Produk::whereIn('id_produk', $pesanan->detailPesanan()->pluck('id_produk'))->get() as $produkKembali) {
+                $notifikasi->periksaProduk($produkKembali);
+            }
         } catch (\Throwable $e) {
             $kode = $e instanceof HttpException
                 ? $e->getStatusCode()

@@ -358,18 +358,17 @@
                         </ol>
                     </div>
 
-                    {{-- Kode ambil --}}
-                    <details class="st-card p-4">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-2">
+                    {{-- Kode ambil (modal) --}}
+                    <button type="button" class="st-card p-4 w-full text-left" data-modal-open="kode-ambil-{{ $pesanan->id_pesanan }}">
+                        <span class="flex items-center justify-between gap-2">
                             <span class="flex items-center gap-2 text-[12px] font-semibold text-[#D8C6BD]">
                                 <i data-lucide="qr-code" class="h-4 w-4"></i>
                                 Kode ambil
                             </span>
-                            <i data-lucide="chevron-down" class="h-4 w-4 text-[#8C7C74]"></i>
-                        </summary>
-                        <p class="mt-3 text-[11.5px] leading-relaxed text-[#9D8E87]">Tunjukkan kode ini di bar / kasir.</p>
-                        <p class="st-code mt-2">{{ $pesanan->nomor_pesanan }}</p>
-                    </details>
+                            <i data-lucide="maximize-2" class="h-4 w-4 text-[#8C7C74]"></i>
+                        </span>
+                        <span class="st-code mt-2 block">{{ $pesanan->nomor_pesanan }}</span>
+                    </button>
                 @endif
             </div>
 
@@ -408,10 +407,10 @@
                     @endif
                 </div>
 
-                <a href="{{ route('struk.show', $pesanan) }}" target="_blank" rel="noopener" class="st-btn st-btn-ghost">
+                <button type="button" data-struk-url="{{ route('struk.show', $pesanan) }}" class="st-btn st-btn-ghost">
                     <i data-lucide="receipt-text"></i>
                     Lihat struk
-                </a>
+                </button>
 
                 <a href="{{ route('pelanggan.menu') }}" class="st-btn st-btn-primary">
                     <i data-lucide="plus"></i>
@@ -770,4 +769,8 @@
 })();
 </script>
 @endpush
+    <x-app-modal id="kode-ambil-{{ $pesanan->id_pesanan }}" title="Kode Ambil Pesanan" subtitle="Tunjukkan kode ini di bar atau kasir" width="420px">
+        <p class="grotesk" style="border-radius:10px;background:#271D19;padding:16px;text-align:center;font-size:22px;font-weight:700;letter-spacing:.06em;color:#F1DFD8;">{{ $pesanan->nomor_pesanan }}</p>
+        <p style="margin-top:10px;font-size:11.5px;line-height:1.65;color:#9D8E87;">Tunjukkan kode ini di bar / kasir saat mengambil pesanan.</p>
+    </x-app-modal>
 @endsection

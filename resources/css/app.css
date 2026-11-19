@@ -1,5 +1,11 @@
 @import 'tailwindcss';
+/* Komponen Blade Filament (filament/support) — ikut satu bundle Vite. */
+@import '../../vendor/filament/support/resources/css/index.css';
+@import './filament-tejas.css';
 @import './admin.css';
+@import './modal.css';
+@import './polish.css';
+@import './lenis.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

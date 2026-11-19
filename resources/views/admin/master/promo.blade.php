@@ -4,6 +4,12 @@
 @section('header-title', 'Master Promo')
 @section('header-subtitle', 'Voucher diskon — dipakai di checkout pelanggan')
 
+@section('header-action')
+  <button type="button" class="btn-new-ticket" data-modal-open="tambah-promo">
+    <i data-lucide="plus" size="14"></i> Tambah Promo
+  </button>
+@endsection
+
 @section('content')
   @if (session('error'))
     <div class="alert-error">{{ session('error') }}</div>
@@ -27,7 +33,7 @@
     </div>
   </section>
 
-  <section class="bottom-grid" style="margin-top:20px;">
+  <section style="margin-top:20px;">
     <div class="card">
       <div class="card-title-row"><div><h3>Daftar Promo</h3><p>Klik Update untuk ubah data</p></div></div>
       <div class="table-wrap">
@@ -48,9 +54,10 @@
                 @else
                   <span class="badge-critical">Nonaktif</span>
                 @endif
-                <details style="margin-top:8px;">
-                  <summary style="font-size:12px;font-weight:600;cursor:pointer;color:var(--accent-caramel);">Update</summary>
-                  <form method="POST" action="{{ route('admin.master.promo.update', $p) }}" style="display:grid;gap:8px;margin-top:8px;">
+                <button type="button" class="btn-sm" data-modal-open="edit-promo-{{ $p->id_promo }}" style="margin-top:8px;width:100%;">Update</button>
+
+                <x-app-modal id="edit-promo-{{ $p->id_promo }}" title="Update Promo" :subtitle="$p->kode_promo" width="620px">
+                  <form method="POST" action="{{ route('admin.master.promo.update', $p) }}" class="app-modal-form">
                     @csrf @method('PUT')
                     <input name="kode_promo" value="{{ old('kode_promo', $p->kode_promo) }}" class="form-input" required>
                     <select name="tipe_diskon" class="form-select">
@@ -64,9 +71,9 @@
                     <label class="form-hint" style="display:flex;gap:8px;align-items:center;">
                       <input type="checkbox" name="status_aktif" value="1" @checked($p->status_aktif)> Status aktif
                     </label>
-                    <button class="btn-sm primary">Simpan</button>
+                    <button type="submit" class="btn-primary full" style="padding:10px;">Simpan</button>
                   </form>
-                </details>
+                </x-app-modal>
               </td>
             </tr>
           @empty
@@ -77,9 +84,8 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title-row"><div><h3>Tambah Promo Baru</h3><p>Voucher langsung bisa ditukar pelanggan</p></div></div>
-      <form method="POST" action="{{ route('admin.master.promo.store') }}">
+    <x-app-modal id="tambah-promo" title="Tambah Promo" subtitle="Voucher langsung bisa ditukar pelanggan" width="620px">
+      <form method="POST" action="{{ route('admin.master.promo.store') }}" class="app-modal-form">
         @csrf
         <div class="form-grid">
           <div class="form-group"><label class="form-label">Kode promo</label><input name="kode_promo" class="form-input" placeholder="COFFEE20" required></div>
@@ -106,8 +112,8 @@
             <input type="checkbox" name="status_aktif" value="1" checked> Status aktif
           </label>
         </div>
-        <button class="btn-primary" style="width:100%;padding:10px;">Simpan Promo</button>
+        <button type="submit" class="btn-primary full" style="padding:10px;">Simpan Promo</button>
       </form>
-    </div>
+    </x-app-modal>
   </section>
 @endsection
